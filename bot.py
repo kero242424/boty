@@ -7,7 +7,6 @@ import datetime
 # Senin emanet token
 TOKEN = 'MTUyNzMyMTQxNjA4NzYzODAxNg.GUXMHz.hLeEQn5LI-LtCLrs8Yh5P2H6iKnyMonb5Mqdgc'
 
-# İzinleri ayarlıyoruz
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -29,42 +28,50 @@ async def ceza(ctx, member: discord.Member = None):
     
     await ctx.send(f"🚨 {member.mention} **CEZALANDIRILDIN!** 🚨\nSadece **23 saniyen** var. Hemen ayrı ayrı mesajlarla tam **10 kere** `{rastgele_kelime}` yazman lazım. Süren başladı!")
 
-    # Hedefin doğru kelimeyi yazdığını kontrol eden filtre
     def check(m):
         return m.author == member and m.channel == ctx.channel and m.content.lower() == rastgele_kelime
 
     toplanan_mesaj_sayisi = 0
-    # 23 saniyelik bir zamanlayıcı kuruyoruz
     bitis_zamani = asyncio.get_event_loop().time() + 23.0
 
     while toplanan_mesaj_sayisi < 10:
         kalan_sure = bitis_zamani - asyncio.get_event_loop().time()
         
-        # Süre bittiyse döngüyü kır
         if kalan_sure <= 0:
             break
             
         try:
-            # Belirlenen süre içinde mesaj bekle
             msg = await bot.wait_for('message', check=check, timeout=kalan_sure)
             await msg.add_reaction('✅')
             toplanan_mesaj_sayisi += 1
         except asyncio.TimeoutError:
-            # Süre dolarsa döngüyü kır
             break
 
-    # Sonuç kısmı
     if toplanan_mesaj_sayisi >= 10:
         await ctx.send(f"Helal lan {member.mention}, klavyeyi parçaladın ama yırttın. Cezan iptal edildi!")
     else:
-        await ctx.send(f"⏱️ Süre doldu! Sadece {toplanan_mesaj_sayisi} kere yazabildin. Acımam aga, yedin timeoutu! 🔨")
+        await ctx.send(f"⏱️ Süre doldu! Sadece {toplanan_mesaj_sayisi} kere yazabildin. Acımam aga, yedin 28 gün mutesini! 🔨")
         
         try:
-            # 1 dakikalık (60 saniye) timeout atıyoruz
-            sure = datetime.timedelta(minutes=1)
+            # DİSCORD MAX LİMİTİ: 28 GÜN
+            sure = datetime.timedelta(days=28)
             await member.timeout(sure, reason="23 saniye kuralında çuvalladı.")
-            await ctx.send(f"{member.mention} 1 dakikalığına kafasını dinlemeye gönderildi. Sıradaki gelsin...")
+            await ctx.send(f"💀 {member.mention} tam 28 gün boyunca susturuldu. Kurtarmak isteyen `!af @kisi` yazsın tabi cesareti varsa...")
         except discord.errors.Forbidden:
-            await ctx.send("Hata: Aga bu adamın yetkisi benden yüksek veya bende 'Üyelere Zaman Aşımı Uygula' yetkisi yok! Çarpamadım.")
+            await ctx.send("Hata: Aga bu adamın yetkisi benden yüksek! Vuramadım kafasına. Rolümü en üste çek!")
+
+# --- YENİ EKLENEN AF KOMUTU ---
+@bot.command()
+async def af(ctx, member: discord.Member = None):
+    if member is None:
+        await ctx.send("Kimi affediyoruz aga? Birini etiketle de zincirlerini kıralım. (Örn: !af @Ahmet)")
+        return
+    
+    try:
+        # Timeout süresini None yaparak cezayı kaldırıyoruz
+        await member.timeout(None, reason="Aga affetti.")
+        await ctx.send(f"🕊️ {member.mention} şanslısın! <@{ctx.author.id}> sana acıdı ve cezanı kaldırdı. Bi daha bulaşma!")
+    except discord.errors.Forbidden:
+        await ctx.send("Hata: Bu adamın cezasını kaldırmaya yetkim yetmiyor, rolümü üste al!")
 
 bot.run(TOKEN)
