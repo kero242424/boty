@@ -1,273 +1,302 @@
 import os
-import sys
 import random
 import asyncio
-import logging
 import datetime
-from typing import Optional
 import discord
 from discord.ext import commands
 
-# GitHub Actions log akışı için optimize edilmiş loglama
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-    stream=sys.stdout
-)
-logger = logging.getLogger('CoreEngine')
+TOKEN = os.environ.get('DISCORD_TOKEN')
 
-# Güvenlik ve sürdürülebilirlik için Token environment variable üzerinden çekilir.
-# Yerel testlerde veya Actions üzerinde 'DISCORD_TOKEN' adıyla tanımlanmalıdır.
-TOKEN = os.getenv("DISCORD_TOKEN", "MTUyNzMyMTQxNjA4NzYzODAxNg.GUXMHz.hLeEQn5LI-LtCLrs8Yh5P2H6iKnyMonb5Mqdgc")
+intents = discord.Intents.default()
+intents.message_content = True
+intents.members = True  # Bazı üye komutları için bu iznin Developer Portal'da açık olması gerekir
 
-class EnterpriseBot(commands.Bot):
-    def __init__(self):
-        intents = discord.Intents.default()
-        intents.message_content = True
-        intents.members = True
-        
-        super().__init__(
-            command_prefix="!", 
-            intents=intents,
-            help_command=None
-        )
-        self.launch_time = datetime.datetime.now(datetime.timezone.utc)
-        self.run_once = os.getenv("RUN_ONCE", "false").lower() == "true"
+bot = commands.Bot(command_prefix='!', intents=intents)
 
-    async def on_ready(self) -> None:
-        logger.info(f"Sistem Doğrulandı. Hesap: {self.user} | ID: {self.user.id}")
-        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="!yardim"))
-        
-        # Bot uyandığında sunuculardaki ilk yazılabilir metin kanalına duyuru gönderir
-        for guild in self.guilds:
-            target_channel = None
-            for channel in guild.text_channels:
-                if channel.permissions_for(guild.me).send_messages:
-                    target_channel = channel
-                    break
-            
-            if target_channel:
-                try:
-                    embed = discord.Embed(
-                        title="🚀 Bot Çevrimiçi!",
-                        description="Sistem başarıyla başlatıldı ve GitHub Actions üzerinden aktif edildi.",
-                        color=discord.Color.from_rgb(16, 185, 129), # Emerald v4
-                        timestamp=datetime.datetime.now(datetime.timezone.utc)
-                    )
-                    embed.add_field(name="Gecikme Süresi", value=f"⚡ `{round(self.latency * 1000)}ms`", inline=True)
-                    embed.add_field(name="Komut Ön Eki", value="⚙️ `!`", inline=True)
-                    embed.set_footer(text="Tüm sistemler çalışır durumda. Yardım için: !yardim")
-                    
-                    await target_channel.send(embed=embed)
-                    logger.info(f"Açılış mesajı başarıyla gönderildi: {guild.name} -> #{target_channel.name}")
-                except Exception as e:
-                    logger.error(f"Açılış mesajı gönderilirken hata oluştu ({guild.name}): {str(e)}")
+# 1. BOT HAZIR OLMA OLAYI
+@bot.event
+async def on_ready():
+    await bot.change_presence(activity=discord.Game(name="40 Özellikli Canavar Bot v1.0"))
+    print(f'{bot.user.name} 40 özellikli sistemiyle aktif edildi!')
 
-        if self.run_once:
-            logger.info("GitHub Actions tek seferlik mod aktif, bağlantı sonlandırılıyor...")
-            await self.close()
+# 2. YENİ ÜYE GELDİĞİNDE SELAMLAMA
+@bot.event
+async def on_member_join(member):
+    channel = member.guild.system_channel
+    if channel:
+        await channel.send(f'Hoş geldin {member.mention}! Aramıza katıldığın için mutluyuz. 🎉')
 
-    async def on_command_error(self, ctx: commands.Context, error: commands.errors.CommandError) -> None:
-        if isinstance(error, commands.CommandNotFound):
-            return
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send("❌ **Yetki Hatası:** Bu komutu çalıştırmak için yetkiniz yetersiz.")
-            return
-        if isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send("⚠️ **Eksik Parametre:** Komutun kullanım biçimi hatalı. `!yardim` yazarak kontrol edin.")
-            return
-        
-        logger.error(f"Komut Hatası [{ctx.command}]: {str(error)}")
-        await ctx.send(f"🔧 **Sistem Hatası:** `{str(error)}`")
+# --- KOMUTLAR BAŞLIYOR ---
 
-bot = EnterpriseBot()
+# 3. Yazı Tura
+@bot.command()
+async def yazitura(ctx):
+    await ctx.send(f"🪙 Sonuç: **{random.choice(['Yazı', 'Tura'])}**")
 
-# ==========================================
-# MODÜL 1: GENEL & ARAÇLAR (7 Komut)
-# ==========================================
+# 4. Sihirli 8 Topu
+@bot.command(name="8ball")
+async def sihirli_top(ctx, *, soru):
+    cevaplar = ["Kesinlikle", "Şüphesiz", "Buna güvenebilirsin", "Daha sonra tekrar sor", "Şimdi tahmin edemem", "Buna odaklanıp tekrar sor", "Kaynağım hayır diyor", "Görünüşe göre pek iyi değil", "Çok şüpheli"]
+    await ctx.send(f"🔮 **Soru:** {soru}\n Cevap: **{random.choice(cevaplar)}**")
 
-@bot.command(name="yardim")
-async def yardim(ctx: commands.Context):
-    embed = discord.Embed(
-        title="🤖 Sistem Kontrol Arayüzü",
-        description="Aşağıda listelenen tüm komut setleri anlık olarak kullanıma hazırdır.",
-        color=discord.Color.from_rgb(99, 102, 241) # Indigo v4
-    )
-    embed.add_field(name="🛠️ Araçlar", value="`!ping`, `!sunucu`, `!profil`, `!avatar`, `!istatistik`, `!davet`", inline=False)
-    embed.add_field(name="🎲 Eğlence & Şans", value="`!zar`, `!yazitura`, `!roll [min] [max]`, `!secim [a,b,c]`, `!sifre [uzunluk]`", inline=False)
-    embed.add_field(name="🛡️ Moderasyon", value="`!temizle [miktar]`, `!sustur [@üye] [süre]`, `!susturac [@üye]`, `!ban [@üye]`, `!kick [@üye]`, `!kullaniciadi [@üye] [yeni_isim]`", inline=False)
-    embed.add_field(name="🔤 Metin İşlemleri", value="`!say [mesaj]`, `!ters [metin]`, `!buyuk [metin]`, `!kucuk [metin]`", inline=False)
-    embed.set_footer(text=f"Talep Sahibi: {ctx.author.name} • Toplam 22 Aktif Komut", icon_url=ctx.author.display_avatar.url)
-    await ctx.send(embed=embed)
-
-@bot.command(name="ping")
-async def ping(ctx: commands.Context):
-    await ctx.send(f"🏓 **Pong!** Gateway Gecikmesi: `{round(bot.latency * 1000)}ms`")
-
-@bot.command(name="sunucu")
-async def sunucu(ctx: commands.Context):
-    guild = ctx.guild
-    if not guild: return
-    embed = discord.Embed(title=f"📊 Sunucu Bilgileri: {guild.name}", color=discord.Color.from_rgb(30, 41, 59)) # Slate 800
-    if guild.icon: embed.set_thumbnail(url=guild.icon.url)
-    embed.add_field(name="Sunucu Sahibi ID", value=f"`{guild.owner_id}`", inline=True)
-    embed.add_field(name="Üye Sayısı", value=f"👥 `{guild.member_count}`", inline=True)
-    embed.add_field(name="Rol Sayısı", value=f"🎭 `{len(guild.roles)}`", inline=True)
-    embed.add_field(name="Oluşturulma Tarihi", value=f"📅 `{guild.created_at.strftime('%d/%m/%Y')}`", inline=False)
-    await ctx.send(embed=embed)
-
-@bot.command(name="profil")
-async def profil(ctx: commands.Context, üye: Optional[discord.Member] = None):
-    target = üye or ctx.author
-    embed = discord.Embed(title=f"👤 Profil Kartı: {target.display_name}", color=target.color)
-    embed.set_thumbnail(url=target.display_avatar.url)
-    embed.add_field(name="Hesap ID", value=f"`{target.id}`", inline=False)
-    embed.add_field(name="Sunucuya Katılım", value=f"`{target.joined_at.strftime('%d/%m/%Y %H:%M') if target.joined_at else 'Bilinmiyor'}`", inline=True)
-    embed.add_field(name="Discord Kayıt", value=f"`{target.created_at.strftime('%d/%m/%Y %H:%M')}`", inline=True)
-    await ctx.send(embed=embed)
-
-@bot.command(name="avatar")
-async def avatar(ctx: commands.Context, üye: Optional[discord.Member] = None):
-    target = üye or ctx.author
-    await ctx.send(f"🖼️ **{target.display_name}** kullanıcısının avatarı:\n{target.display_avatar.with_size(1024).url}")
-
-@bot.command(name="istatistik")
-async def istatistik(ctx: commands.Context):
-    uptime = datetime.datetime.now(datetime.timezone.utc) - bot.launch_time
-    hours, remainder = divmod(int(uptime.total_seconds()), 3600)
-    minutes, seconds = divmod(remainder, 60)
-    
-    embed = discord.Embed(title="⚙️ Altyapı Operasyonel Durumu", color=discord.Color.from_rgb(16, 185, 129))
-    embed.add_field(name="Çalışma Süresi", value=f"`{hours} saat {minutes} dakika {seconds} saniye`", inline=False)
-    embed.add_field(name="Bağlı Sunucu", value=f"🌐 `{len(bot.guilds)}`", inline=True)
-    embed.add_field(name="Toplam İzlenen Kullanıcı", value=f"👥 `{len(bot.users)}`", inline=True)
-    await ctx.send(embed=embed)
-
-@bot.command(name="davet")
-async def davet(ctx: commands.Context):
-    await ctx.send(f"🔗 Bot Yetkilendirme Linki: https://discord.com/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot")
-
-# ==========================================
-# MODÜL 2: EĞLENCE & ŞANS (5 Komut)
-# ==========================================
-
-@bot.command(name="zar")
-async def zar(ctx: commands.Context):
-    await ctx.send(f"🎲 Rastgele zar sonucu: **{random.randint(1, 6)}**")
-
-@bot.command(name="yazitura")
-async def yazitura(ctx: commands.Context):
-    await ctx.send(f"🪙 Madeni para atıldı: **{random.choice(['Yazı', 'Tura'])}**")
-
-@bot.command(name="roll")
-async def roll(ctx: commands.Context, minimum: int = 1, maksimum: int = 100):
-    if minimum >= maksimum:
-        await ctx.send("❌ Hata: Minimum değer maksimum değerden büyük veya eşit olamaz.")
-        return
-    await ctx.send(f"🔢 [{minimum} - {maksimum}] aralığında gelen sayı: **{random.randint(minimum, maksimum)}**")
-
-@bot.command(name="secim")
-async def secim(ctx: commands.Context, *, seçenekler: str):
-    liste = [item.strip() for item in seçenekler.split(",") if item.strip()]
-    if len(liste) < 2:
-        await ctx.send("❌ Hata: Lütfen virgülle ayırarak en az 2 seçenek belirtin. Örn: `!secim Elma, Armut`")
-        return
-    await ctx.send(f"🤔 Karar mekanizması seçti: **{random.choice(liste)}**")
-
-@bot.command(name="sifre")
-async def sifre(ctx: commands.Context, uzunluk: int = 12):
-    if uzunluk < 6 or uzunluk > 32:
-        await ctx.send("❌ Güvenlik hatası: Şifre uzunluğu en az 6, en fazla 32 olmalıdır.")
-        return
-    karakterler = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()"
-    üretilen = "".join(random.choice(karakterler) for _ in range(uzunluk))
-    try:
-        await ctx.author.send(f"🔒 İstediğin rastgele şifre üretildi: `{üretilen}`")
-        await ctx.send("📥 Şifreniz güvenlik sebebiyle DM kutunuza gönderildi.")
-    except discord.Forbidden:
-        await ctx.send("❌ DM kutunuz kapalı olduğu için şifreyi iletemedim.")
-
-# ==========================================
-# MODÜL 3: MODERASYON (6 Komut)
-# ==========================================
-
-@bot.command(name="temizle")
-@commands.has_permissions(manage_messages=True)
-async def temizle(ctx: commands.Context, miktar: int = 10):
-    if miktar < 1 or miktar > 100:
-        await ctx.send("❌ Sınır Aşımı: Tek seferde 1 ila 100 adet mesaj temizlenebilir.")
-        return
-    silinen = await ctx.channel.purge(limit=miktar + 1)
-    msg = await ctx.send(f"🗑️ `{len(silinen) - 1}` adet mesaj temizlendi.")
+# 5. Mesaj Silme (Moderasyon)
+@bot.command()
+async def sil(ctx, miktar: int):
+    if miktar > 100:
+        return await ctx.send("Tek seferde en fazla 100 mesaj silebilirsin!")
+    await ctx.channel.purge(limit=miktar + 1)
+    msg = await ctx.send(f"🗑️ {miktar} adet mesaj temizlendi.")
     await asyncio.sleep(3)
-    try: await msg.delete()
-    except discord.NotFound: pass
+    await msg.delete()
 
-@bot.command(name="sustur")
-@commands.has_permissions(moderate_members=True)
-async def sustur(ctx: commands.Context, üye: discord.Member, dakika: int = 10):
-    süre = datetime.timedelta(minutes=dakika)
-    await üye.timeout(süre, reason=f"Mod: {ctx.author.name} tarafından susturuldu.")
-    await ctx.send(f"🤫 **{üye.display_name}**, {dakika} dakika boyunca susturuldu.")
+# 6. Sunucu Bilgisi
+@bot.command()
+async def sunucubilgi(ctx):
+    embed = discord.Embed(title=f"{ctx.guild.name} Sunucu Bilgileri", color=discord.Color.blue())
+    embed.add_field(name="Üye Sayısı", value=ctx.guild.member_count)
+    embed.add_field(name="Oluşturulma Tarihi", value=ctx.guild.created_at.strftime("%d/%m/%Y"))
+    embed.set_thumbnail(url=ctx.guild.icon.url if ctx.guild.icon else None)
+    await ctx.send(embed=embed)
 
-@bot.command(name="susturac")
-@commands.has_permissions(moderate_members=True)
-async def susturac(ctx: commands.Context, üye: discord.Member):
-    await üye.timeout(None, reason=f"Mod: {ctx.author.name} susturmayı kaldırdı.")
-    await ctx.send(f"🔊 **{üye.display_name}** üzerindeki susturma kaldırıldı.")
+# 7. Kullanıcı Bilgisi
+@bot.command()
+async def kullanıcı(ctx, member: discord.Member = None):
+    member = member or ctx.author
+    embed = discord.Embed(title=f"{member.name} Profil Kartı", color=discord.Color.green())
+    embed.add_field(name="Hesap Açılışı", value=member.created_at.strftime("%d/%m/%Y"))
+    embed.add_field(name="Sunucuya Katılım", value=member.joined_at.strftime("%d/%m/%Y"))
+    embed.set_thumbnail(url=member.avatar.url if member.avatar else None)
+    await ctx.send(embed=embed)
 
-@bot.command(name="ban")
-@commands.has_permissions(ban_members=True)
-async def ban(ctx: commands.Context, üye: discord.Member, *, neden: str = "Belirtilmedi"):
-    await üye.ban(reason=neden)
-    await ctx.send(f"💥 **{üye.display_name}** sunucudan banlandı. Gerekçe: `{neden}`")
+# 8. Ping Ölçer
+@bot.command()
+async def ping(ctx):
+    await ctx.send(f"🏓 Pong! Gecikme süresi: **{round(bot.latency * 1000)}ms**")
 
-@bot.command(name="kick")
-@commands.has_permissions(kick_members=True)
-async def kick(ctx: commands.Context, üye: discord.Member, *, neden: str = "Belirtilmedi"):
-    await üye.kick(reason=neden)
-    await ctx.send(f"👢 **{üye.display_name}** sunucudan atıldı. Gerekçe: `{neden}`")
+# 9. Rastgele Sayı Üretici
+@bot.command()
+async def zar(ctx):
+    await ctx.send(f"🎲 Zar attın! Çıkan sayı: **{random.randint(1, 6)}**")
 
-@bot.command(name="kullaniciadi")
-@commands.has_permissions(manage_nicknames=True)
-async def kullaniciadi(ctx: commands.Context, üye: discord.Member, *, yeni_isim: str):
-    await üye.edit(nick=yeni_isim)
-    await ctx.send(f"📝 **{üye.name}** kullanıcısının takma adı `{yeni_isim}` olarak değiştirildi.")
+# 10. Aşk Ölçer
+@bot.command()
+async def askolcer(ctx, kisi: discord.Member):
+    oran = random.randint(0, 100)
+    await ctx.send(f"❤️ {ctx.author.mention} ile {kisi.mention} arasındaki aşk oranı: **%{oran}**")
 
-# ==========================================
-# MODÜL 4: METİN İŞLEMLERİ (4 Komut)
-# ==========================================
+# 11. Sayı Tahmin Oyunu
+@bot.command()
+async def sayitahmin(ctx):
+    dogru_sayi = random.randint(1, 10)
+    await ctx.send("🤖 1 ile 10 arasında bir sayı tuttum. Tahmin et bakalım! (Sadece sayıyı yaz)")
+    
+    def check(m):
+        return m.author == ctx.author and m.channel == ctx.channel and m.content.isdigit()
 
-@bot.command(name="say")
-async def say(ctx: commands.Context, *, mesaj: str):
-    try: await ctx.message.delete()
-    except discord.Forbidden: pass
-    await ctx.send(mesaj)
+    try:
+        tahmin = await bot.wait_for('message', check=check, timeout=15.0)
+        if int(tahmin.content) == dogru_sayi:
+            await ctx.send("🎉 Tebrikler, doğru bildin!")
+        else:
+            await ctx.send(f"❌ Bilemedin! Doğru cevap **{dogru_sayi}** olacaktı.")
+    except asyncio.TimeoutError:
+        await ctx.send(f"⏰ Süren doldu! Tuttuğum sayı **{dogru_sayi}** idi.")
 
-@bot.command(name="ters")
-async def ters(ctx: commands.Context, *, metin: str):
+# 12. Avatar Gösterici
+@bot.command()
+async def avatar(ctx, member: discord.Member = None):
+    member = member or ctx.author
+    url = member.avatar.url if member.avatar else "https://discord.com/assets/c0990d036356445175e14d3ca9c00b08.png"
+    await ctx.send(f"📸 {member.name} kullanıcısının avatarı:\n{url}")
+
+# 13. Kelime Ters Çevirici
+@bot.command()
+async def terscevir(ctx, *, metin):
     await ctx.send(metin[::-1])
 
-@bot.command(name="buyuk")
-async def buyuk(ctx: commands.Context, *, metin: str):
+# 14. Taş Kağıt Makas
+@bot.command()
+async def tkm(ctx, secim: str):
+    secenekler = ["taş", "kağıt", "makas"]
+    bot_secimi = random.choice(secenekler)
+    secim = secim.lower()
+    if secim not in secenekler:
+        return await ctx.send("Lütfen sadece 'taş', 'kağıt' veya 'makas' yazın.")
+    
+    if secim == bot_secimi:
+        await ctx.send(f"Berabere! İkimiz de **{secim}** seçtik.")
+    elif (secim == "taş" and bot_secimi == "makas") or (secim == "kağıt" and bot_secimi == "taş") or (secim == "makas" and bot_secimi == "kağıt"):
+        await ctx.send(f"Tebrikler sen kazandın! Sen: **{secim}** | Bot: **{bot_secimi}**")
+    else:
+        await ctx.send(f"Kaybettin! Sen: **{secim}** | Bot: **{bot_secimi}**")
+
+# 15. Sunucu Logosu
+@bot.command()
+async def sunucuresmi(ctx):
+    if ctx.guild.icon:
+        await ctx.send(ctx.guild.icon.url)
+    else:
+        await ctx.send("Bu sunucunun bir logosu yok.")
+
+# 16. Rastgele Espri
+@bot.command()
+async def espri(ctx):
+    espriler = [
+        "Geçen gün bir taksi çevirdim, hala dönüyor.",
+        "Radyo çalıyordu ama polis yakalayamadı.",
+        "İngilizcem çok iyi, 'Yes' biliyorum, 'No' biliyorum... Başka ne var ki?",
+        "Adamın biri gülmüş, saksıya dikmişler."
+    ]
+    await ctx.send(random.choice(espriler))
+
+# 17. Tokat Atma
+@bot.command()
+async def tokat(ctx, member: discord.Member):
+    await ctx.send(f"✋ {ctx.author.mention}, {member.mention} kullanıcısına okkalı bir tokat attı!")
+
+# 18. IQ Testi
+@bot.command()
+async def iq(ctx):
+    await ctx.send(f"🧠 Beyin hücrelerini tarıyorum... IQ Skorun: **{random.randint(50, 150)}**")
+
+# 19. Şanslı Sayı
+@bot.command()
+async def sanslisayi(ctx):
+    await ctx.send(f"🔮 Bugünün senin için uğurlu sayısı: **{random.randint(1, 100)}**")
+
+# 20. Seçim Yapıcı
+@bot.command()
+async def sec(ctx, *, secenekler):
+    liste = secenekler.split(",")
+    await ctx.send(f"🤔 Bence en mantıklısı: **{random.choice(liste).strip()}**")
+
+# 21. Büyük Harfe Çevir
+@bot.command()
+async def buyut(ctx, *, metin):
     await ctx.send(metin.upper())
 
-@bot.command(name="kucuk")
-async def kucuk(ctx: commands.Context, *, metin: str):
+# 22. Küçük Harfe Çevir
+@bot.command()
+async def kucult(ctx, *, metin):
     await ctx.send(metin.lower())
 
-# ==========================================
-# ANA BAŞLATICI
-# ==========================================
-def main():
-    if not TOKEN:
-        logger.critical("Hata: Geçerli bir token bulunamadı.")
-        sys.exit(1)
-    try:
-        bot.run(TOKEN, reconnect=True)
-    except discord.LoginFailure:
-        logger.critical("Hata: Sağlanan Discord tokenı geçersiz veya Discord tarafından iptal edilmiş.")
-        sys.exit(1)
+# 23. Botun Yaşı
+@bot.command()
+async def botyas(ctx):
+    await ctx.send("🤖 Ben daha çok gencim, 2026 model son teknoloji bir yapay zekayım!")
 
-if __name__ == "__main__":
-    main()
+# 24. Üye Banlama (Yetki gerektirir)
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def ban(ctx, member: discord.Member, *, sebep="Belirtilmedi"):
+    await member.ban(reason=sebep)
+    await ctx.send(f"🔨 {member.name} sunucudan banlandı! Sebep: {sebep}")
+
+# 25. Üye Kickleme (Yetki gerektirir)
+@bot.command()
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, member: discord.Member, *, sebep="Belirtilmedi"):
+    await member.kick(reason=sebep)
+    await ctx.send(f"👢 {member.name} sunucudan atıldı! Sebep: {sebep}")
+
+# 26. Dünyanın En Komik Şakası (Spoiler İçerir)
+@bot.command()
+async def saka(ctx):
+    await ctx.send("||Dünyada 10 çeşit insan vardır; ikilik tabanı bilenler ve bilmeyenler.||")
+
+# 27. Rol Verme (Basit)
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def rolver(ctx, member: discord.Member, role: discord.Role):
+    await member.add_roles(role)
+    await ctx.send(f"✅ {member.mention} kullanıcısına **{role.name}** rolü verildi.")
+
+# 28. Rol Alma
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def rolal(ctx, member: discord.Member, role: discord.Role):
+    await member.remove_roles(role)
+    await ctx.send(f"❌ {member.mention} kullanıcısından **{role.name}** rolü geri alındı.")
+
+# 29. Kanal Kilitleme
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def kilitle(ctx):
+    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
+    await ctx.send("🔒 Bu kanal yeni mesaj gönderimine kapatıldı.")
+
+# 30. Kanal Kilidi Açma
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def kilitac(ctx):
+    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
+    await ctx.send("🔓 Bu kanalın kilidi açıldı, herkes yazabilir.")
+
+# 31. Kaç Gün Oldu?
+@bot.command()
+async def kacgun(ctx):
+    fark = datetime.datetime.now(datetime.timezone.utc) - ctx.guild.created_at
+    await ctx.send(f"📅 Bu sunucu kurulalı tam **{fark.days}** gün olmuş!")
+
+# 32. Havalı Yazı Formatı
+@bot.command()
+async def havali(ctx, *, metin):
+    await ctx.send(f"✨ 𝓔𝓿𝓮𝓽, ş𝓾 𝓪𝓷 𝓱𝓪𝓿𝓪𝓵ı 𝔂𝓪𝔃ı𝓵ı𝔂𝓸𝓻: **{metin}** ✨")
+
+# 33. Madeni Para Fırlat
+@bot.command()
+async def firlat(ctx):
+    await ctx.send(f"🚀 Parayı havaya fırlattın ve masanın altına kaçtı! Bulamıyoruz...")
+
+# 34. Takma Ad Değiştirme
+@bot.command()
+@commands.has_permissions(manage_nicknames=True)
+async def nickdegis(ctx, member: discord.Member, *, yeni_isim):
+    await member.edit(nick=yeni_isim)
+    await ctx.send(f"📝 {member.name} kullanıcısının ismi değiştirildi: **{yeni_isim}**")
+
+# 35. Rastgele Renk Kodu
+@bot.command()
+async def renk(ctx):
+    renk_kodu = "".join([random.choice("0123456789ABCDEF") for _ in range(6)])
+    await ctx.send(f"🎨 Senin için rastgele bir renk kodu: **#{renk_kodu}**")
+
+# 36. Toplama İşlemi
+@bot.command()
+async def topla(ctx, a: int, b: int):
+    await ctx.send(f"➕ Sonuç: **{a + b}**")
+
+# 37. Çıkarma İşlemi
+@bot.command()
+async def cikar(ctx, a: int, b: int):
+    await ctx.send(f"➖ Sonuç: **{a - b}**")
+
+# 38. Çarpma İşlemi
+@bot.command()
+async def carp(ctx, a: int, b: int):
+    await ctx.send(f"✖️ Sonuç: **{a * b}**")
+
+# 39. Bölme İşlemi
+@bot.command()
+async def bol(ctx, a: int, b: int):
+    if b == 0:
+        return await ctx.send("🚨 Bir sayı sıfıra bölünemez!")
+    await ctx.send(f"➗ Sonuç: **{a / b}**")
+
+# 40. Gelişmiş Yardım Menüsü
+@bot.command()
+async def yardim(ctx):
+    embed = discord.Embed(title="📜 Canavar Bot Komut Menüsü (Tam 40 Özellik)", color=discord.Color.purple())
+    embed.description = (
+        "**Eğlence:** `!yazitura`, `!8ball`, `!zar`, `!askolcer`, `!sayitahmin`, `!tkm`, `!espri`, `!tokat`, `!iq`, `!sanslisayi`, `!firlat`, `!saka` \n"
+        "**Araçlar & Bilgi:** `!sunucubilgi`, `!kullanıcı`, `!ping`, `!avatar`, `!sunucuresmi`, `!terscevir`, `!sec`, `!buyut`, `!kucult`, `!botyas`, `!kacgun`, `!havali`, `!renk` \n"
+        "**Matematik:** `!topla`, `!cikar`, `!carp`, `!bol` \n"
+        "**Moderasyon:** `!sil`, `!ban`, `!kick`, `!rolver`, `!rolal`, `!kilitle`, `!kilitac`, `!nickdegis` \n"
+        "**Olaylar:** Sunucuya yeni biri gelince otomatik karşılama ve oynuyor durumu!"
+    )
+    await ctx.send(embed=embed)
+
+# Varsayılan yardım komutunu kapatıp kendi yazdığımızı aktif ediyoruz
+bot.remove_command('help')
+
+bot.run(TOKEN)
