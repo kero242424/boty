@@ -1,8 +1,13 @@
 name: Discord Bot Runner
 
+# Aynı anda birden fazla iş tetiklenirse eskisini otomatik olarak öldürür:
+concurrency:
+  group: discord-bot
+  cancel-in-progress: true
+
 on:
   push:
-    branches: [ "main" ] # Kodları 'main' dalına yüklediğinde çalışır
+    branches: [ "main" ] # Kodları main dalına yüklediğinde çalışır
   workflow_dispatch: # GitHub sitesinden botu elle başlatmanı sağlar
 
 jobs:
