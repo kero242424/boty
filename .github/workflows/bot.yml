@@ -6,31 +6,35 @@ on:
   workflow_dispatch:
     inputs:
       run_once_mode:
-        description: 'Tek seferlik görev modu mu? (true/false)'
+        description: 'Execution mode override (true/false)'
         required: true
         default: 'false'
+
+# Mutex control layer to eliminate duplicate bot process lifecycles
+concurrency:
+  group: discord-bot-singleton-runtime
+  cancel-in-progress: true
 
 jobs:
   run-discord-bot:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Kodu Repodan Çek
+    - name: Checkout Repository Source
       uses: actions/checkout@v4
 
-    - name: Python Ortamını Hazırla
+    - name: Initialize Standard Python Runtime Environment
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
         cache: 'pip'
 
-    - name: Kütüphaneleri Yükle
+    - name: Synchronize Virtual Environment Dependencies
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-    - name: Bot Motorunu Ateşle
+    - name: Spin Up Main Bot Application Process
       env:
-        # Kodun içindeki tokenı okuyacak, ekstra GitHub Secret ayarına gerek kalmayacak
         RUN_ONCE: ${{ github.event.inputs.run_once_mode || 'false' }}
       run: python bot.py
