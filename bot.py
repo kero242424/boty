@@ -5,6 +5,7 @@ import discord
 from discord.ext import commands
 import requests
 from datetime import datetime, timedelta
+import asyncio
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -28,7 +29,7 @@ def sayi_coumle(deger_str: str) -> int:
     elif deger_str.endswith('m'):
         carpici = 1_000_000
         deger_str = deger_str[:-1]
-    elif deger_str.endswith('b'): # Milyar için alternatif
+    elif deger_str.endswith('b'):
         carpici = 1_000_000_000
         deger_str = deger_str[:-1]
         
@@ -88,7 +89,7 @@ async def send_startup_commit_notification():
         embed.add_field(name="📝 Commit", value=f">>> {commit_message}", inline=False)
         embed.add_field(name="🔗 Link", value=f"[Commit'e Git]({commit_url})", inline=True)
         embed.set_thumbnail(url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png")
-        embed.set_footer(text="Python Ultra Bot v53.0", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
+        embed.set_footer(text="Python Ultra Bot v54.0 Kaos Edition", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
 
         await channel.send(embed=embed)
     except Exception as e:
@@ -141,7 +142,181 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# --- KLASİK / TEMEL ÖZELLİKLER ---
+
+# --- OTOMATİK #OYUNLAR HEDİYE MEKANİZMASI ---
+
+class NitroParadButonu(discord.ui.View):
+    def __init__(self, miktar):
+        super().__init__(timeout=None)
+        self.miktar = miktar
+        self.tiklandi = False
+
+    @discord.ui.button(label="🎁 HEDİYEYİ KAPIŞ", style=discord.ButtonStyle.blurple, custom_id="nitro_parad_kap")
+    async def hediyeyi_kap(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.tiklandi:
+            await interaction.response.send_message("❌ Geç kaldın koçum, bunu başkası çoktan kaptı bile!", ephemeral=True)
+            return
+        
+        self.tiklandi = True
+        kazanan = interaction.user
+        
+        user_bakiye[kazanan.id] = user_bakiye.get(kazanan.id, 1000) + self.miktar
+        
+        button.disabled = True
+        button.label = f"KAPILDI: {kazanan.name}"
+        button.style = discord.ButtonStyle.grey
+        
+        embed = interaction.message.embeds[0]
+        embed.color = 0x95A5A6
+        embed.title = "🎁 DİSCORD HEDİYESİ KAPILDI!"
+        embed.description = f"⚡ Nefesler tutuldu ve **{kazanan.mention}** adeta ışık hızında davranarak **{self.miktar:,} Coin**'lik batık ödülünü kaptı!"
+        
+        await interaction.message.edit(embed=embed, view=self)
+        await interaction.response.send_message(f"🎉 Helal olsun {kazanan.mention}! Cüzdanına eklendi: **+{self.miktar:,} Coin**!")
+
+
+async def kaybi_oyunlara_dusur(guild, miktar, kaybeden):
+    if miktar <= 0:
+        return
+    
+    oyunlar_kanali = discord.utils.get(guild.text_channels, name="oyunlar")
+    if not oyunlar_kanali:
+        return
+
+    embed = discord.Embed(
+        title="🎉 Birisi size bir Discord Hediyesi gönderdi!",
+        description=f"🎁 **{kaybeden.name}** kumarda battı ve ortaya **{miktar:,} Coin** değerinde ödül saçtı!\nAşağıdaki **Hediyeyi Kapış** butonuna **ilk tıklayan** parayı anında cebine atar. Görelim kim daha hızlı!",
+        color=0x5865F2,
+        timestamp=discord.utils.utcnow()
+    )
+    embed.set_footer(text=f"Batıran: {kaybeden.name}", icon_url=kaybeden.avatar.url if kaybeden.avatar else None)
+    
+    view = NitroParadButonu(miktar)
+    await oyunlar_kanali.send(embed=embed, view=view)
+
+
+# --- KUMARHANE & EKONOMİ SİSTEMİ ---
+
+@bot.command(name="bakiye", help="Cüzdanındaki parayı gösterir.")
+async def bakiye(ctx, member: discord.Member = None):
+    target = member or ctx.author
+    para = user_bakiye.get(target.id, 1000)
+    user_bakiye[target.id] = para
+    embed = discord.Embed(title=f"💰 {target.name} - Cüzdan", description=f"Güncel Bakiye: **{para:,} Coin**", color=0xF1C40F)
+    await ctx.send(embed=embed)
+
+@bot.command(name="gunluk", help="Her gün 500 coin toplarsın.")
+async def gunluk(ctx):
+    author_id = ctx.author.id
+    para = user_bakiye.get(author_id, 1000)
+    para += 500
+    user_bakiye[author_id] = para
+    await ctx.send(f"🎁 {ctx.author.mention} Günlük bonusunu aldın! Cüzdana **+500 Coin** eklendi.")
+
+@bot.command(name="paraekle", help="Belirtilen kullanıcıya para ekler (Örn: !paraekle @user 1m).")
+async def paraekle(ctx, member: discord.Member, miktar_str: str):
+    miktar = sayi_coumle(miktar_str)
+    if miktar <= 0:
+        await ctx.send("❌ Geçersiz miktar! Örn: `100`, `50k`, `1m` gibi yazmalısın.")
+        return
+
+    author_id = member.id
+    mevcut = user_bakiye.get(author_id, 1000)
+    yeni_bakiye = mevcut + miktar
+    user_bakiye[author_id] = yeni_bakiye
+    await ctx.send(f"💸 {member.mention} hesabına **{miktar:,} Coin** eklendi! Yeni bakiye: **{yeni_bakiye:,} Coin**")
+
+@bot.command(name="slots", help="Animasyonlu slot makinesi (Örn: !slots 50k).")
+async def slots(ctx, miktar_str: str = "100"):
+    miktar = sayi_coumle(miktar_str)
+    author_id = ctx.author.id
+    bakiye_miktari = user_bakiye.get(author_id, 1000)
+
+    if miktar <= 0 or bakiye_miktari < miktar:
+        await ctx.send("❌ Yetersiz bakiye veya geçersiz miktar!")
+        return
+
+    user_bakiye[author_id] -= miktar
+    msg = await ctx.send("🎰 **Slot Makinesi Çevriliyor...**\n[ 🔄 | 🔄 | 🔄 ]")
+    await asyncio.sleep(1)
+    
+    sym = ["🍒", "🍋", "⭐", "🔔", "💎"]
+    s = [random.choice(sym) for _ in range(3)]
+    
+    kazanc = 0
+    if s[0] == s[1] == s[2]:
+        kazanc = miktar * 5
+        sonuc = f"🎉 **JACKPOT!** {kazanc:,} Coin kazandın!"
+    elif s[0] == s[1] or s[1] == s[2] or s[0] == s[2]:
+        kazanc = int(miktar * 1.5)
+        sonuc = f"✨ **Tebrikler!** {kazanc:,} Coin kazandın!"
+    else:
+        sonuc = f"💸 **Kaybettin!** Kaybettiğin **{miktar:,} Coin** anında **#oyunlar** kanalına hediye olarak fırlatıldı!"
+        await kaybi_oyunlara_dusur(ctx.guild, miktar, ctx.author)
+
+    user_bakiye[author_id] += kazanc
+    await msg.edit(content=f"🎰 **Slot Sonucu**\n[ {s[0]} | {s[1]} | {s[2]} ]\n\n{sonuc}\n💼 Kalan Bakiye: **{user_bakiye[author_id]:,} Coin**")
+
+@bot.command(name="rulet", help="Renk bazlı rulet oyunu (Örn: !rulet kirmizi 10k).")
+async def rulet(ctx, renk: str, miktar_str: str = "100"):
+    author_id = ctx.author.id
+    bakiye_miktari = user_bakiye.get(author_id, 1000)
+    renk = renk.lower()
+    miktar = sayi_coumle(miktar_str)
+
+    if renk not in ["kirmizi", "siyah", "yesil"]:
+        await ctx.send("❌ Geçersiz renk! `kirmizi`, `siyah` veya `yesil` seçmelisin.")
+        return
+
+    if miktar <= 0 or bakiye_miktari < miktar:
+        await ctx.send("❌ Yetersiz bakiye veya geçersiz miktar!")
+        return
+
+    user_bakiye[author_id] -= miktar
+    msg = await ctx.send(f"🎲 Rulet çarkı dönüyor... ({renk.upper()} için {miktar:,} coin yatırıldı)")
+    await asyncio.sleep(1.5)
+
+    sans = random.choices(["kirmizi", "siyah", "yesil"], weights=[48, 48, 4], k=1)[0]
+    
+    kazanc = 0
+    if sans == renk:
+        carpan = 14 if sans == "yesil" else 2
+        kazanc = miktar * carpan
+        user_bakiye[author_id] += kazanc
+        sonuc = f"🎯 Çark **{sans.upper()}** geldi! Kazandın: **+{kazanc:,} Coin**"
+    else:
+        sonuc = f"❌ Kaybettin! **{miktar:,} Coin** batık parası **#oyunlar** kanalına hediye olarak saçıldı."
+        await kaybi_oyunlara_dusur(ctx.guild, miktar, ctx.author)
+
+    await msg.edit(content=f"🎲 **Rulet Sonucu**\nGelen: **{sans.upper()}**\n\n{sonuc}\n💼 Kalan Bakiye: **{user_bakiye[author_id]:,} Coin**")
+
+
+# --- !SOPA ---
+
+@bot.command(name="sopa", help="Belirtilen kullanıcıya 40 saniye timeout verir ve mesajlarını 2 dakika bozar.")
+async def sopa(ctx, member: discord.Member, *, sebep: str = "Test sopası"):
+    try:
+        sure = timedelta(seconds=40)
+        await member.timeout(sure, reason=sebep)
+        sopa_cezalilar[member.id] = datetime.now() + timedelta(minutes=2)
+
+        embed = discord.Embed(
+            title="🔨 Kafaya Sopa İndi!",
+            description=f"**{member.mention}** adlı kişinin kafasına kaya gibi sopa indirildi!",
+            color=0xE74C3C,
+            timestamp=discord.utils.utcnow()
+        )
+        embed.add_field(name="⏳ Timeout Süresi", value="40 Saniye", inline=True)
+        embed.add_field(name="🌀 Bozuk Mesaj Süresi", value="2 Dakika", inline=True)
+        embed.add_field(name="📌 Sebep", value=sebep, inline=False)
+        embed.set_footer(text=f"Sopalayan: {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
+        
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"⚠️ Sopa atılırken hata oluştu: {e}")
+
+
+# --- DİĞER PRO KOMUTLAR ---
 
 @bot.command(name="havadurumu", help="Belirtilen şehrin anlık hava durumunu gösterir.")
 async def havadurumu(ctx, *, sehir: str = "Istanbul"):
@@ -218,133 +393,6 @@ async def itiraf(ctx, *, mesaj: str):
     embed = discord.Embed(title="🥷 Gizli İtiraf Kutusu", description=f">>> {mesaj}", color=0x2C3E50, timestamp=discord.utils.utcnow())
     embed.set_footer(text="Bu mesaj tamamen anonimdir.")
     await ctx.send(embed=embed)
-
-
-# --- KUMARHANE & EKONOMİ SİSTEMİ (Akıllı Sayı Desteğiyle) ---
-
-@bot.command(name="bakiye", help="Cüzdanındaki parayı gösterir.")
-async def bakiye(ctx, member: discord.Member = None):
-    target = member or ctx.author
-    para = user_bakiye.get(target.id, 1000)
-    user_bakiye[target.id] = para
-    embed = discord.Embed(title=f"💰 {target.name} - Cüzdan", description=f"Güncel Bakiye: **{para:,} Coin**", color=0xF1C40F)
-    await ctx.send(embed=embed)
-
-@bot.command(name="gunluk", help="Her gün 500 coin toplarsın.")
-async def gunluk(ctx):
-    author_id = ctx.author.id
-    para = user_bakiye.get(author_id, 1000)
-    para += 500
-    user_bakiye[author_id] = para
-    await ctx.send(f"🎁 {ctx.author.mention} Günlük bonusunu aldın! Cüzdana **+500 Coin** eklendi. Toplam: **{para:,} Coin**")
-
-@bot.command(name="paraekle", help="Belirtilen kullanıcıya para ekler (Örn: !paraekle @user 1m).")
-async def paraekle(ctx, member: discord.Member, miktar_str: str):
-    miktar = sayi_coumle(miktar_str)
-    if miktar <= 0:
-        await ctx.send("❌ Geçersiz miktar! Örn: `100`, `50k`, `1m` gibi yazmalısın.")
-        return
-
-    author_id = member.id
-    mevcut = user_bakiye.get(author_id, 1000)
-    yeni_bakiye = mevcut + miktar
-    user_bakiye[author_id] = yeni_bakiye
-    await ctx.send(f"💸 {member.mention} hesabına **{miktar:,} Coin** eklendi! Yeni bakiye: **{yeni_bakiye:,} Coin**")
-
-@bot.command(name="slots", help="Animasyonlu slot makinesi (Örn: !slots 50k).")
-async def slots(ctx, miktar_str: str = "100"):
-    miktar = sayi_coumle(miktar_str)
-    author_id = ctx.author.id
-    bakiye_miktari = user_bakiye.get(author_id, 1000)
-
-    if miktar <= 0 or bakiye_miktari < miktar:
-        await ctx.send("❌ Yetersiz bakiye veya geçersiz miktar!")
-        return
-
-    user_bakiye[author_id] -= miktar
-
-    msg = await ctx.send("🎰 **Slot Makinesi Çevriliyor...**\n[ 🔄 | 🔄 | 🔄 ]")
-    
-    import asyncio
-    await asyncio.sleep(1)
-    
-    sym = ["🍒", "🍋", "⭐", "🔔", "💎"]
-    s = [random.choice(sym) for _ in range(3)]
-    
-    kazanc = 0
-    if s[0] == s[1] == s[2]:
-        kazanc = miktar * 5
-        sonuc = f"🎉 **JACKPOT!** {kazanc:,} Coin kazandın!"
-    elif s[0] == s[1] or s[1] == s[2] or s[0] == s[2]:
-        kazanc = int(miktar * 1.5)
-        sonuc = f"✨ **Tebrikler!** İki aynı sembol yakaladın, {kazanc:,} Coin kazandın!"
-    else:
-        sonuc = "💸 **Kaybettin!** Bahtına küs."
-
-    user_bakiye[author_id] += kazanc
-    await msg.edit(content=f"🎰 **Slot Makinesi Sonucu**\n[ {s[0]} | {s[1]} | {s[2]} ]\n\n{sonuc}\n💼 Kalan Bakiye: **{user_bakiye[author_id]:,} Coin**")
-
-@bot.command(name="rulet", help="Renk bazlı rulet oyunu (Örn: !rulet kirmizi 10k).")
-async def rulet(ctx, renk: str, miktar_str: str = "100"):
-    author_id = ctx.author.id
-    bakiye_miktari = user_bakiye.get(author_id, 1000)
-    renk = renk.lower()
-    miktar = sayi_coumle(miktar_str)
-
-    if renk not in ["kirmizi", "siyah", "yesil"]:
-        await ctx.send("❌ Geçersiz renk! `kirmizi`, `siyah` veya `yesil` seçmelisin.")
-        return
-
-    if miktar <= 0 or bakiye_miktari < miktar:
-        await ctx.send("❌ Yetersiz bakiye veya geçersiz miktar!")
-        return
-
-    user_bakiye[author_id] -= miktar
-    msg = await ctx.send(f"🎲 Rulet çarkı dönüyor... ({renk.upper()} için {miktar:,} coin yatırıldı)")
-    
-    import asyncio
-    await asyncio.sleep(1.5)
-
-    sans = random.choices(["kirmizi", "siyah", "yesil"], weights=[48, 48, 4], k=1)[0]
-    
-    kazanc = 0
-    if sans == renk:
-        carpan = 14 if sans == "yesil" else 2
-        kazanc = miktar * carpan
-        user_bakiye[author_id] += kazanc
-        sonuc = f"🎯 Çark **{sans.upper()}** geldi! Kazandın: **+{kazanc:,} Coin**"
-    else:
-        sonuc = f"❌ Çark **{sans.upper()}** geldi. Kaybettin!"
-
-    await msg.edit(content=f"🎲 **Rulet Sonucu**\nGelen Renk: **{sans.upper()}**\n\n{sonuc}\n💼 Kalan Bakiye: **{user_bakiye[author_id]:,} Coin**")
-
-
-# --- !SOPA ---
-
-@bot.command(name="sopa", help="Belirtilen kullanıcıya 40 saniye timeout verir ve mesajlarını 2 dakika bozar.")
-async def sopa(ctx, member: discord.Member, *, sebep: str = "Test sopası"):
-    try:
-        sure = timedelta(seconds=40)
-        await member.timeout(sure, reason=sebep)
-        sopa_cezalilar[member.id] = datetime.now() + timedelta(minutes=2)
-
-        embed = discord.Embed(
-            title="🔨 Kafaya Sopa İndi!",
-            description=f"**{member.mention}** adlı kişinin kafasına kaya gibi sopa indirildi!",
-            color=0xE74C3C,
-            timestamp=discord.utils.utcnow()
-        )
-        embed.add_field(name="⏳ Timeout Süresi", value="40 Saniye", inline=True)
-        embed.add_field(name="🌀 Bozuk Mesaj Süresi", value="2 Dakika", inline=True)
-        embed.add_field(name="📌 Sebep", value=sebep, inline=False)
-        embed.set_footer(text=f"Sopalayan: {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
-        
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"⚠️ Sopa atılırken hata oluştu: {e}")
-
-
-# --- DİĞER PRO KOMUTLAR ---
 
 @bot.command(name="avatar", help="Profil fotoğrafını büyütür.")
 async def avatar(ctx, member: discord.Member = None):
