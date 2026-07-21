@@ -2,19 +2,21 @@ import os
 import sys
 import discord
 from discord.ext import commands
+import requests
 
-# Botun yetkilerini (intents) açıyoruz (mesajları okuyabilmesi için message_content şart)
 intents = discord.Intents.default()
 intents.guilds = True
 intents.message_content = True
+intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# Basit bir hafıza (XP ve Seviye sistemi için)
+user_xp = {}
+
 @bot.event
 async def on_ready():
-    print(f"Bot aktif ve online: {bot.user}")
-    
-    # Bot ilk açıldığında GitHub'dan tetiklendiyse otomatik commit bildirimi atabilir
+    print(f"Süper Bot devrede: {bot.user}")
     await send_startup_commit_notification()
 
 async def send_startup_commit_notification():
@@ -40,10 +42,9 @@ async def send_startup_commit_notification():
         if not channel:
             return
 
-        # Sadece GitHub Actions üzerinden tetiklendiyse bu env değişkeni dolu gelir
         commit_message = os.getenv("GITHUB_COMMIT_MESSAGE")
         if not commit_message:
-            return # Normal manuel açılışta commit bildirimi atıp spam yapmasın
+            return
 
         commit_author = os.getenv("GITHUB_ACTOR", "Bilinmeyen Yazar")
         repo_name = os.getenv("GITHUB_REPOSITORY", "Bilinmeyen Repo")
@@ -51,54 +52,124 @@ async def send_startup_commit_notification():
         commit_sha = commit_sha_full[:7] if commit_sha_full else "0000000"
         commit_url = f"https://github.com/{repo_name}/commit/{commit_sha_full}"
         ref_name = os.getenv("GITHUB_REF_NAME", "main")
-        workflow_name = os.getenv("GITHUB_WORKFLOW", "GitHub Actions")
 
         embed = discord.Embed(
-            title="🚀 Yeni Kod Güncellemesi Alındı!",
-            description="Depoda hareketlilik var! Yeni commit başarıyla sisteme işlendi.",
-            color=0x00FF7F,
+            title="🚀 Mega GitHub Entegrasyonu Tetiklendi!",
+            description="Yeni kod satırları sisteme başarıyla işlendi.",
+            color=0x9B59B6,
             timestamp=discord.utils.utcnow()
         )
-        embed.add_field(name="📁 Proje / Depo", value=f"`{repo_name}`", inline=True)
-        embed.add_field(name="🌿 Hedef Dal (Branch)", value=f"`{ref_name}`", inline=True)
-        embed.add_field(name="👤 Geliştirici", value=f"**{commit_author}**", inline=True)
-        embed.add_field(name="📝 Commit Mesajı", value=f">>> {commit_message}", inline=False)
-        embed.add_field(name="🔗 Commit Kodu & Link", value=f"[{commit_sha}]({commit_url})", inline=True)
-        embed.add_field(name="⚙️ Çalışan İşlem", value=f"`{workflow_name}`", inline=True)
+        embed.add_field(name="📁 Depo", value=f"`{repo_name}`", inline=True)
+        embed.add_field(name="🌿 Branch", value=f"`{ref_name}`", inline=True)
+        embed.add_field(name="👤 Yazar", value=f"**{commit_author}**", inline=True)
+        embed.add_field(name="📝 Commit", value=f">>> {commit_message}", inline=False)
+        embed.add_field(name="🔗 Link", value=f"[Commit'e Git]({commit_url})", inline=True)
         embed.set_thumbnail(url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png")
-        embed.set_footer(text="Python Sürekli Aktif Bot • Komut Modu", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
+        embed.set_footer(text="Python Ultra Bot v3.0", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
 
         await channel.send(embed=embed)
     except Exception as e:
-        print(f"Commit bildirimi gönderilemedi: {e}")
+        print(f"Commit bildirimi hatası: {e}")
 
-# --- BOT KOMUTLARI ---
+# --- GELİŞMİŞ ÖZELLİK 1: OTO-KORUMA & XP SİSTEMİ ---
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
 
-@bot.command(name="ping", help="Botun gecikme süresini (ms) gösterir.")
+    # Küfür veya Reklam Engelleyici Simülasyonu
+    yasakli_kelimeler = ["discord.gg/", "mal", "orospu", "fuck"]
+    content_lower = message.content.lower()
+    if any(word in content_lower for word in yasakli_kelimeler):
+        try:
+            await message.delete()
+            await message.channel.send(f"⚠️ {message.author.mention}, bu sunucuda bu tarz içeriklerin paylaşılması yasak!", delete_after=5)
+            return
+        except:
+            pass
+
+    # XP ve Seviye Sistemi (Her mesaja 10 XP kazandırır)
+    author_id = message.author.id
+    if author_id not in user_xp:
+        user_xp[author_id] = 0
+    
+    user_xp[author_id] += 10
+
+    await bot.process_commands(message)
+
+# --- ÇILGIN KOMUTLAR ---
+
+@bot.command(name="havadurumu", help="Belirtilen şehrin anlık hava durumunu gösterir.")
+wttr_cache = {} # Basit önbellek (opsiyonel)
+async def havadurumu(ctx, *, sehir: str = "Istanbul"):
+    try:
+        #wttr.in üzerinden anlık hava verisi çekme (API anahtarı istemez!)
+        url = f"https://wttr.in/{sehir}?format=j1"
+        response = requests.get(url, timeout=5)
+        if response.status_code != 200:
+            await ctx.send("❌ Hava durumu bilgisi alınamadı, şehir adını kontrol et.")
+            return
+
+        data = response.json()
+        current = data['current_condition'][0]
+        temp = current['temp_C']
+        feels = current['FeelsLikeC']
+        desc = current['weatherDesc'][0]['value']
+        humidity = current['humidity']
+        wind = current['windspeedKmph']
+
+        embed = discord.Embed(
+            title=f"🌤️ {sehir.capitalize()} İçin Hava Durumu",
+            color=0x3498DB,
+            timestamp=discord.utils.utcnow()
+        )
+        embed.add_field(name="🌡️ Sıcaklık", value=f"**{temp}°C** (Hissedilen: {feels}°C)", inline=True)
+        embed.add_field(name="☁️ Durum", value=f"**{desc}**", inline=True)
+        embed.add_field(name="💧 Nem Oranı", value=f"%{humidity}", inline=True)
+        embed.add_field(name="💨 Rüzgar Hızı", value=f"{wind} km/s", inline=True)
+        
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"⚠️ Bir hata oluştu: {e}")
+
+@bot.command(name="seviye", help="Kullanıcının anlık XP ve seviye durumunu gösterir.")
+async def seviye(ctx, member: discord.Member = None):
+    target = member or ctx.author
+    xp = user_xp.get(target.id, 0)
+    level = xp // 100 # Her 100 XP 1 seviye atlatır
+
+    embed = discord.Embed(title=f"📊 {target.name} - Seviye Kartı", color=0xE74C3C)
+    embed.set_thumbnail(url=target.avatar.url if target.avatar else target.default_avatar.url)
+    embed.add_field(name="⭐ Toplam XP", value=f"{xp} XP", inline=True)
+    embed.add_field(name="🏆 Seviye", value=f"Level {level}", inline=True)
+    embed.set_footer(text="Sohbet ettikçe XP kazanırsın!")
+    
+    await ctx.send(embed=embed)
+
+@bot.command(name="anket", help="Sunucuda hızlıca anket açar. Örnek: !anket Pizza mı Lahmacun mu?")
+async def anket(ctx, *, soru: str):
+    await ctx.message.delete() # Komut mesajını temizle
+    embed = discord.Embed(
+        title="📊 Sunucu Anketi",
+        description=f"**{soru}**",
+        color=0xF1C40F,
+        timestamp=discord.utils.utcnow()
+    )
+    embed.set_footer(text=fBaşlatan: {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
+    
+    poll_msg = await ctx.send(embed=embed)
+    await poll_msg.add_reaction("👍")
+    await poll_msg.add_reaction("👎")
+    await poll_msg.add_reaction("🤔")
+
+@bot.command(name="ping", help="Gecikme süresini ölçer.")
 async def ping(ctx):
     latency = round(bot.latency * 1000)
-    await ctx.send(f"Pong! 🏓 Gecikme süresi: **{latency}ms**")
-
-@bot.command(name="selam", help="Bota selam verirsin.")
-async def selam(ctx):
-    await ctx.send(f"Aleykümselam kralsın! 👑 Nasılsın {ctx.author.mention}?")
-
-@bot.command(name="bilgi", help="Bot ve sistem hakkında bilgi verir.")
-async def bilgi(ctx):
-    embed = discord.Embed(
-        title="🤖 Bot Bilgi Paneli",
-        description="Bu bot GitHub entegrasyonlu ve sohbet komutlarına duyarlı özel bir Python botudur.",
-        color=0x3498DB
-    )
-    embed.add_field(name="🛠️ Altyapı", value="Python & Discord.py", inline=True)
-    embed.add_field(name="📌 Komut Öneki", value="`!`", inline=True)
-    embed.add_field(name="⚡ Durum", value="7/24 Aktif", inline=True)
-    embed.set_footer(text=f"İsteyen: {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
-    await ctx.send(embed=embed)
+    await ctx.send(f"Roket hızında çalışıyoruz! 🚀 Gecikme: **{latency}ms**")
 
 token = os.getenv("DISCORD_TOKEN")
 if not token:
-    print("Hata: DISCORD_TOKEN bulunamadı!")
+    print("Hata: Token bulunamadı!")
     sys.exit(1)
 
 bot.run(token)
