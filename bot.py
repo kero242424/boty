@@ -67,7 +67,7 @@ async def send_startup_commit_notification():
         embed.add_field(name="📝 Commit", value=f">>> {commit_message}", inline=False)
         embed.add_field(name="🔗 Link", value=f"[Commit'e Git]({commit_url})", inline=True)
         embed.set_thumbnail(url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png")
-        embed.set_footer(text="Python Ultra Bot v10.0", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
+        embed.set_footer(text="Python Ultra Bot v10.1", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
 
         await channel.send(embed=embed)
     except Exception as e:
@@ -78,15 +78,12 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    # AFK Kontrolü (Biri AFK kullanıcıya etiket atarsa uyarı gönder)
     if message.mentions:
         for mentioned in message.mentions:
             if mentioned.id in afk_users:
                 reason = afk_users[mentioned.id]
-                await message.channel.values if hasattr(message.channel, 'values') else None
                 await message.channel.send(f"💤 **{mentioned.name}** şu anda AFK! Sebep: *{reason}*")
 
-    # Kendi AFK'sından dönen varsa AFK'sını sil
     if message.author.id in afk_users:
         del afk_users[message.author.id]
         await message.channel.send(f"👋 Hoş geldin {message.author.mention}, AFK modundan çıktın!", delete_after=5)
@@ -230,7 +227,7 @@ async def kullanicibilgi(ctx, member: discord.Member = None):
 async def ceviri(ctx, dil: str, *, metin: str):
     embed = discord.Embed(title="🌐 Akıllı Dil Çevirmeni", color=0x1ABC9C)
     embed.add_field(name=f"Orijinal Metin ({dil})", value=metin, inline=False)
-    embed.add_field(name="Çeviri Sonucu", value=f"*{metin[::-1]}* (Çevirimotoru simüle edildi)", inline=False)
+    embed.add_field(name="Çeviri Sonucu", value=f"*{metin[::-1]}* (Çeviri motoru simüle edildi)", inline=False)
     await ctx.send(embed=embed)
 
 @bot.command(name="hatirlatici", help="Belirtilen süre sonra sana hatırlatma yapar. Örn: !hatirlatici 10 Toplantı")
@@ -357,9 +354,9 @@ async def renk(ctx):
 async def zaratma(ctx, adet: int = 1):
     if adet < 1 or adet > 5:
         adet = 1
-     sonuclar = [random.randint(1, 6) for _ in range(adet)]
-     embed = discord.Embed(title="🎲 Çoklu Zar Simülasyonu", description=f"Atılan Zarlar: {sonuclar}\nToplam: **{sum(sonuclar)}**", color=0x9B59B6)
-     await ctx.send(embed=embed)
+    sonuclar = [random.randint(1, 6) for _ in range(adet)]
+    embed = discord.Embed(title="🎲 Çoklu Zar Simülasyonu", description=f"Atılan Zarlar: {sonuclar}\nToplam: **{sum(sonuclar)}**", color=0x9B59B6)
+    await ctx.send(embed=embed)
 
 @bot.command(name="tersyaz", help="Kelimeyi harf harf tersine çevirip şık gösterir.")
 async def tersyaz(ctx, *, kelime: str):
