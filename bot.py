@@ -77,8 +77,8 @@ async def send_startup_commit_notification():
         ref_name = os.getenv("GITHUB_REF_NAME", "main")
 
         embed = discord.Embed(
-            title="🚀 Lokal hakari.gif Modu Aktif!",
-            description="Ses derdi yok, doğrudan 100M+ kazanınca repodaki hakari.gif patlıyor.",
+            title="🚀 3 Eşleşme 3x (Hakari) Modu Aktif!",
+            description="Ses derdi yok, sadece 3 eşleşme ve 100M+ kazanınca repodaki hakari.gif patlıyor.",
             color=0xF1C40F,
             timestamp=discord.utils.utcnow()
         )
@@ -88,7 +88,7 @@ async def send_startup_commit_notification():
         embed.add_field(name="📝 Commit", value=f">>> {commit_message}", inline=False)
         embed.add_field(name="🔗 Link", value=f"[Commit'e Git]({commit_url})", inline=True)
         embed.set_thumbnail(url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png")
-        embed.set_footer(text="Python GIF Edition v102.0", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
+        embed.set_footer(text="Python GIF Edition v104.0", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
 
         await channel.send(embed=embed)
     except Exception as e:
@@ -194,7 +194,7 @@ async def kaybi_oyunlara_dusur(guild, miktar, kaybeden):
     await oyunlar_kanali.send(embed=embed, view=view)
 
 
-# --- 100M+ HAKARİ.GIF DESTEKLİ OYUNLAR ---
+# --- 3 EŞLEŞME 3X (100M+ HAKARİ) OYUNLARI ---
 
 @bot.command(name="bakiye", help="Cüzdanındaki parayı gösterir.")
 async def bakiye(ctx, member: discord.Member = None):
@@ -225,7 +225,7 @@ async def paraekle(ctx, member: discord.Member, miktar_str: str):
     user_bakiye[author_id] = yeni_bakiye
     await ctx.send(f"💸 {member.mention} hesabına **{miktar:,} Coin** eklendi! Yeni bakiye: **{yeni_bakiye:,} Coin**")
 
-@bot.command(name="slots", help="100M+ kazanınca repodaki hakari.gif'i patlatan slot makinesi.")
+@bot.command(name="slots", help="3 eşleşme 3x, 2 eşleşme 2x kazandıran slot makinesi.")
 async def slots(ctx, miktar_str: str = "100"):
     miktar = sayi_coumle(miktar_str)
     author_id = ctx.author.id
@@ -256,34 +256,30 @@ async def slots(ctx, miktar_str: str = "100"):
     hakkari_tetiklendi = False
     
     if s[0] == s[1] == s[2]:
-        kazanc = miktar * 5
+        kazanc = miktar * 3
         user_bakiye[author_id] += kazanc
         if kazanc >= 100_000_000:
             hakkari_tetiklendi = True
-            sonuc = f"🔥 **ASRIN HAKARİ VURGUNU! 100M+ KAZANDIN!** Kazanç: **+{kazanc:,} Coin**\n> *Ekranda hakari.gif patlıyor!* 🏔️🦅"
+            sonuc = f"🔥 **3LÜ FULL ÇEKİLDİ! (3X VURGUNU) 100M+ KAZANDIN!** Kazanç: **+{kazanc:,} Coin**\n> *Ekranda hakari.gif patlıyor!* 🏔️🦅"
         else:
-            sonuc = f"🎉 **DEV JACKPOT!** Muazzam vurgun, kazandın: **+{kazanc:,} Coin**!"
+            sonuc = f"🎉 **ÜÇTE ÜÇ (3X)!** Harika vurgun, kazandın: **+{kazanc:,} Coin**!"
     elif s[0] == s[1] or s[1] == s[2] or s[0] == s[2]:
-        kazanc = int(miktar * 1.5)
+        kazanc = miktar * 2
         user_bakiye[author_id] += kazanc
-        if kazanc >= 100_000_000:
-            hakkari_tetiklendi = True
-            sonuc = f"✨ **HAKARİ BEREKETİ! 100M+ KAZANDIN!** Kazanç: **+{kazanc:,} Coin**\n> *Ekranda hakari.gif patlıyor!* 🏔️🦅"
-        else:
-            sonuc = f"✨ **TEBRİKLER!** İki sembol eşleşti, kazandın: **+{kazanc:,} Coin**!"
+        sonuc = f"✨ **İKİDE İKİ (2X)!** İki sembol eşleşti, kazandın: **+{kazanc:,} Coin**!"
     else:
         sonuc = f"💸 **PATLADIN!** Yatırılan **{miktar:,} Coin** tuzla buz olup yere saçıldı ve **#oyunlar** kanalına düştü!"
         await kaybi_oyunlara_dusur(ctx.guild, miktar, ctx.author)
 
     await msg.edit(content=f"🎰 **[ ⚡ SLOT FİNAL SONUCU ⚡ ]**\n\n      **[ {s[0]} | {s[1]} | {s[2]} ]**\n\n{sonuc}\n💼 Güncel Cüzdan: **{user_bakiye[author_id]:,} Coin**")
 
-    # REPODAN LOKAL HAKARİ.GIF GÖNDERİCİSİ
+    # SADECE 3 EŞLEŞME VE 100M+ OLUNCA ÇALIŞAN HAKARİ.GIF GÖNDERİCİSİ
     if hakkari_tetiklendi:
         if os.path.exists("hakari.gif"):
             file = discord.File("hakari.gif", filename="hakari.gif")
             await ctx.send(file=file)
         else:
-            await ctx.send("🏔️ *100M+ patladı ama repoda 'hakari.gif' bulunamadı koçum! Dosyayı eklemeyi unutma.*")
+            await ctx.send("🏔️ *100M+ patladı ama repoda 'hakari.gif' bulunamadı koçum!*")
 
 @bot.command(name="rulet", help="Animasyonlu rulet oyunu.")
 async def rulet(ctx, renk: str, miktar_str: str = "100"):
