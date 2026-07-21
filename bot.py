@@ -11,7 +11,6 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Basit bir hafıza (XP ve Seviye sistemi için)
 user_xp = {}
 
 @bot.event
@@ -71,13 +70,11 @@ async def send_startup_commit_notification():
     except Exception as e:
         print(f"Commit bildirimi hatası: {e}")
 
-# --- GELİŞMİŞ ÖZELLİK 1: OTO-KORUMA & XP SİSTEMİ ---
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
 
-    # Küfür veya Reklam Engelleyici Simülasyonu
     yasakli_kelimeler = ["discord.gg/", "mal", "orospu", "fuck"]
     content_lower = message.content.lower()
     if any(word in content_lower for word in yasakli_kelimeler):
@@ -88,7 +85,6 @@ async def on_message(message):
         except:
             pass
 
-    # XP ve Seviye Sistemi (Her mesaja 10 XP kazandırır)
     author_id = message.author.id
     if author_id not in user_xp:
         user_xp[author_id] = 0
@@ -97,13 +93,9 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
-# --- ÇILGIN KOMUTLAR ---
-
 @bot.command(name="havadurumu", help="Belirtilen şehrin anlık hava durumunu gösterir.")
-wttr_cache = {} # Basit önbellek (opsiyonel)
 async def havadurumu(ctx, *, sehir: str = "Istanbul"):
     try:
-        #wttr.in üzerinden anlık hava verisi çekme (API anahtarı istemez!)
         url = f"https://wttr.in/{sehir}?format=j1"
         response = requests.get(url, timeout=5)
         if response.status_code != 200:
@@ -136,7 +128,7 @@ async def havadurumu(ctx, *, sehir: str = "Istanbul"):
 async def seviye(ctx, member: discord.Member = None):
     target = member or ctx.author
     xp = user_xp.get(target.id, 0)
-    level = xp // 100 # Her 100 XP 1 seviye atlatır
+    level = xp // 100
 
     embed = discord.Embed(title=f"📊 {target.name} - Seviye Kartı", color=0xE74C3C)
     embed.set_thumbnail(url=target.avatar.url if target.avatar else target.default_avatar.url)
@@ -146,16 +138,17 @@ async def seviye(ctx, member: discord.Member = None):
     
     await ctx.send(embed=embed)
 
-@bot.command(name="anket", help="Sunucuda hızlıca anket açar. Örnek: !anket Pizza mı Lahmacun mu?")
+@bot.command(name="anket", help="Sunucuda hızlıca anket açar.")
 async def anket(ctx, *, soru: str):
-    await ctx.message.delete() # Komut mesajını temizle
+    await ctx.message.delete()
     embed = discord.Embed(
         title="📊 Sunucu Anketi",
         description=f"**{soru}**",
         color=0xF1C40F,
         timestamp=discord.utils.utcnow()
     )
-    embed.set_footer(text=fBaşlatan: {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
+    # Hatanın düzeltildiği yer: tırnaklar düzgünce kapatıldı
+    embed.set_footer(text=f"Başlatan: {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
     
     poll_msg = await ctx.send(embed=embed)
     await poll_msg.add_reaction("👍")
