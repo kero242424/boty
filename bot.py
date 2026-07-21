@@ -18,6 +18,25 @@ afk_users = {}
 user_bakiye = {}
 sopa_cezalilar = {}
 
+# Yardımcı Fonksiyon: 1k, 1m gibi ifadeleri sayıya çevirir
+def sayi_coumle(deger_str: str) -> int:
+    deger_str = deger_str.lower().strip()
+    carpici = 1
+    if deger_str.endswith('k'):
+        carpici = 1_000
+        deger_str = deger_str[:-1]
+    elif deger_str.endswith('m'):
+        carpici = 1_000_000
+        deger_str = deger_str[:-1]
+    elif deger_str.endswith('b'): # Milyar için alternatif
+        carpici = 1_000_000_000
+        deger_str = deger_str[:-1]
+        
+    try:
+        return int(float(deger_str) * carpici)
+    except ValueError:
+        return 0
+
 @bot.event
 async def on_ready():
     print(f"Mega Ultra Bot devrede: {bot.user}")
@@ -201,12 +220,12 @@ async def itiraf(ctx, *, mesaj: str):
     await ctx.send(embed=embed)
 
 
-# --- KUMARHANE & EKONOMİ SİSTEMİ ---
+# --- KUMARHANE & EKONOMİ SİSTEMİ (Akıllı Sayı Desteğiyle) ---
 
 @bot.command(name="bakiye", help="Cüzdanındaki parayı gösterir.")
 async def bakiye(ctx, member: discord.Member = None):
     target = member or ctx.author
-    para = user_bakiye.get(target.id, 1000) # Varsayılan başlangıç 1000 coin
+    para = user_bakiye.get(target.id, 1000)
     user_bakiye[target.id] = para
     embed = discord.Embed(title=f"💰 {target.name} - Cüzdan", description=f"Güncel Bakiye: **{para:,} Coin**", color=0xF1C40F)
     await ctx.send(embed=embed)
@@ -219,16 +238,22 @@ async def gunluk(ctx):
     user_bakiye[author_id] = para
     await ctx.send(f"🎁 {ctx.author.mention} Günlük bonusunu aldın! Cüzdana **+500 Coin** eklendi. Toplam: **{para:,} Coin**")
 
-@bot.command(name="paraekle", help="Belirtilen kullanıcıya para ekler (Test amaçlı).")
-async def paraekle(ctx, member: discord.Member, miktar: int):
+@bot.command(name="paraekle", help="Belirtilen kullanıcıya para ekler (Örn: !paraekle @user 1m).")
+async def paraekle(ctx, member: discord.Member, miktar_str: str):
+    miktar = sayi_coumle(miktar_str)
+    if miktar <= 0:
+        await ctx.send("❌ Geçersiz miktar! Örn: `100`, `50k`, `1m` gibi yazmalısın.")
+        return
+
     author_id = member.id
     mevcut = user_bakiye.get(author_id, 1000)
     yeni_bakiye = mevcut + miktar
     user_bakiye[author_id] = yeni_bakiye
     await ctx.send(f"💸 {member.mention} hesabına **{miktar:,} Coin** eklendi! Yeni bakiye: **{yeni_bakiye:,} Coin**")
 
-@bot.command(name="slots", help="Animasyonlu slot makinesi.")
-async def slots(ctx, miktar: int = 100):
+@bot.command(name="slots", help="Animasyonlu slot makinesi (Örn: !slots 50k).")
+async def slots(ctx, miktar_str: str = "100"):
+    miktar = sayi_coumle(miktar_str)
     author_id = ctx.author.id
     bakiye_miktari = user_bakiye.get(author_id, 1000)
 
@@ -240,7 +265,6 @@ async def slots(ctx, miktar: int = 100):
 
     msg = await ctx.send("🎰 **Slot Makinesi Çevriliyor...**\n[ 🔄 | 🔄 | 🔄 ]")
     
-    # Simüle edilmiş animasyon adımları
     import asyncio
     await asyncio.sleep(1)
     
@@ -260,27 +284,27 @@ async def slots(ctx, miktar: int = 100):
     user_bakiye[author_id] += kazanc
     await msg.edit(content=f"🎰 **Slot Makinesi Sonucu**\n[ {s[0]} | {s[1]} | {s[2]} ]\n\n{sonuc}\n💼 Kalan Bakiye: **{user_bakiye[author_id]:,} Coin**")
 
-@bot.command(name="rulet", help="Renk bazlı rulet oyunu (kirmizi / siyah / yesil).")
-async def rulet(ctx, renk: str, miktar: int = 100):
+@bot.command(name="rulet", help="Renk bazlı rulet oyunu (Örn: !rulet kirmizi 10k).")
+async def rulet(ctx, renk: str, miktar_str: str = "100"):
     author_id = ctx.author.id
     bakiye_miktari = user_bakiye.get(author_id, 1000)
     renk = renk.lower()
+    miktar = sayi_coumle(miktar_str)
 
     if renk not in ["kirmizi", "siyah", "yesil"]:
         await ctx.send("❌ Geçersiz renk! `kirmizi`, `siyah` veya `yesil` seçmelisin.")
         return
 
     if miktar <= 0 or bakiye_miktari < miktar:
-        await ctx.send("❌ Yetersiz bakiye!")
+        await ctx.send("❌ Yetersiz bakiye veya geçersiz miktar!")
         return
 
     user_bakiye[author_id] -= miktar
-    msg = await ctx.send(f"🎲 Rulet çarkı dönüyor... ({renk.upper()} için {iktar} coin yatırıldı)")
+    msg = await ctx.send(f"🎲 Rulet çarkı dönüyor... ({renk.upper()} için {miktar:,} coin yatırıldı)")
     
     import asyncio
     await asyncio.sleep(1.5)
 
-    # %48 Kırmızı, %48 Siyah, %4 Yeşil
     sans = random.choices(["kirmizi", "siyah", "yesil"], weights=[48, 48, 4], k=1)[0]
     
     kazanc = 0
