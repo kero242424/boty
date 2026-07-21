@@ -64,7 +64,7 @@ async def send_startup_commit_notification():
         embed.add_field(name="📝 Commit", value=f">>> {commit_message}", inline=False)
         embed.add_field(name="🔗 Link", value=f"[Commit'e Git]({commit_url})", inline=True)
         embed.set_thumbnail(url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png")
-        embed.set_footer(text="Python Ultra Bot v3.0", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
+        embed.set_footer(text="Python Ultra Bot v4.0", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
 
         await channel.send(embed=embed)
     except Exception as e:
@@ -92,6 +92,8 @@ async def on_message(message):
     user_xp[author_id] += 10
 
     await bot.process_commands(message)
+
+# --- KLASİK & ÇILGIN KOMUTLAR ---
 
 @bot.command(name="havadurumu", help="Belirtilen şehrin anlık hava durumunu gösterir.")
 async def havadurumu(ctx, *, sehir: str = "Istanbul"):
@@ -147,13 +149,63 @@ async def anket(ctx, *, soru: str):
         color=0xF1C40F,
         timestamp=discord.utils.utcnow()
     )
-    # Hatanın düzeltildiği yer: tırnaklar düzgünce kapatıldı
     embed.set_footer(text=f"Başlatan: {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
     
     poll_msg = await ctx.send(embed=embed)
     await poll_msg.add_reaction("👍")
     await poll_msg.add_reaction("👎")
     await poll_msg.add_reaction("🤔")
+
+# --- YENİ EKLENEN SINIR TANIMAZ ÖZELLİKLER ---
+
+@bot.command(name="borsa", help="İstediğin kripto paranın anlık değerini çeker (Örn: !borsa bitcoin)")
+async def borsa(coin_ctx, *, coin: str = "bitcoin"):
+    try:
+        coin_id = coin.lower().strip()
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd,try&include_24hr_change=true"
+        res = requests.get(url, timeout=5).json()
+        
+        if coin_id not in res:
+            await coin_ctx.send(f"❌ '{coin}' adında bir kripto para bulunamadı!")
+            return
+
+        price_usd = res[coin_id]['usd']
+        price_try = res[coin_id]['try']
+        change_24h = res[coin_id].get('usd_24h_change', 0)
+        
+        renk = 0x2ECC71 if change_24h >= 0 else 0xE74C3C
+        yon = "📈" if change_24h >= 0 else "📉"
+
+        embed = discord.Embed(
+            title=f"{yon} {coin.upper()} Canlı Piyasa Verisi",
+            color=renk,
+            timestamp=discord.utils.utcnow()
+        )
+        embed.add_field(name="💵 Dolar Bazlı", value=f"**${price_usd:,.2f}**", inline=True)
+        embed.add_field(name="₺ Türk Lirası", value=f"**₺{price_try:,.2f}**", inline=True)
+        embed.add_field(name="📊 24 Saatlik Değişim", value=f"%{change_24h:.2f}", inline=True)
+        embed.set_footer(text="CoinGecko API Entegrasyonu")
+
+        await coin_ctx.send(embed=embed)
+    except Exception as e:
+        await coin_ctx.send(f"⚠️ Piyasa verisi çekilirken hata oluştu: {e}")
+
+@bot.command(name="itiraf", help="İsmini gizleyerek anonim itiraf gönderir.")
+async def itiraf(ctx, *, mesaj: str):
+    try:
+        await ctx.message.delete() # Kullanıcının komut mesajını yok et ki kimse görmesin
+        
+        embed = discord.Embed(
+            title="🥷 Gizli İtiraf Kutusu",
+            description=f">>> {mesaj}",
+            color=0x2C3E50,
+            timestamp=discord.utils.utcnow()
+        )
+        embed.set_footer(text="Bu mesaj tamamen anonim olarak gönderilmiştir.")
+        
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"⚠️ İtiraf gönderilemedi: {e}", delete_after=5)
 
 @bot.command(name="ping", help="Gecikme süresini ölçer.")
 async def ping(ctx):
