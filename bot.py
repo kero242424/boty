@@ -4,7 +4,7 @@ import random
 import discord
 from discord.ext import commands
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -16,6 +16,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 user_xp = {}
 afk_users = {}
 user_bakiye = {}
+sopa_cezalilar = {} # !sopa yiyenlerin cezalarını takip etmek için
 
 @bot.event
 async def on_ready():
@@ -68,7 +69,7 @@ async def send_startup_commit_notification():
         embed.add_field(name="📝 Commit", value=f">>> {commit_message}", inline=False)
         embed.add_field(name="🔗 Link", value=f"[Commit'e Git]({commit_url})", inline=True)
         embed.set_thumbnail(url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png")
-        embed.set_footer(text="Python Ultra Bot v50.0", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
+        embed.set_footer(text="Python Ultra Bot v51.0", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
 
         await channel.send(embed=embed)
     except Exception as e:
@@ -79,14 +80,31 @@ async def on_message(message):
     if message.author.bot:
         return
 
+    author_id = message.author.id
+
+    # !sopa cezası kontrolü (2 dakika boyunca mesajları bozuk gitsin)
+    if author_id in sopa_cezalilar:
+        bitis_zamani = sopa_cezalilar[author_id]
+        if datetime.now() < bitis_zamani:
+            try:
+                await message.delete() # Orijinal mesajı sil
+                # Mesajı bozuk hale getir (ters çevir + rastgele glitch ekle)
+                bozuk_metin = message.content[::-1] + " 🥴 [Sopa Yedim Sistemim Bozuldu]"
+                await message.channel.send(f"🔨 {message.author.mention} sopa yediği için kelimeleri birbirine girdi: {bozuk_metin}")
+            except:
+                pass
+            return
+        else:
+            del sopa_cezalilar[author_id] # Süresi dolmuşsa cezayı kaldır
+
     if message.mentions:
         for mentioned in message.mentions:
             if mentioned.id in afk_users:
                 reason = afk_users[mentioned.id]
                 await message.channel.send(f"💤 **{mentioned.name}** şu anda AFK! Sebep: *{reason}*")
 
-    if message.author.id in afk_users:
-        del afk_users[message.author.id]
+    if author_id in afk_users:
+        del afk_users[author_id]
         await message.channel.send(f"👋 Hoş geldin {message.author.mention}, AFK modundan çıktın!", delete_after=5)
 
     yasakli_kelimeler = ["discord.gg/", "mal", "orospu", "fuck"]
@@ -99,7 +117,6 @@ async def on_message(message):
         except:
             pass
 
-    author_id = message.author.id
     if author_id not in user_xp:
         user_xp[author_id] = 0
     
@@ -186,7 +203,43 @@ async def itiraf(ctx, *, mesaj: str):
     await ctx.send(embed=embed)
 
 
-# --- 50 ADET YEPYENİ PRO KOMUT ---
+# --- ÖZEL YENİ KOMUT: !SOPA ---
+
+@bot.command(name="sopa", help="Belirtilen kullanıcıya 40 saniye timeout verir ve mesajlarını 2 dakika bozar.")
+@commands.has_permissions(moderate_members=True)
+async def sopa(ctx, member: discord.Member, *, sebep: str = "Kurallara uymamak"):
+    try:
+        # 1. 40 saniye Timeout uygula
+        sure = timedelta(seconds=40)
+        await member.timeout(sure, reason=sebep)
+        
+        # 2. 2 dakika boyunca mesajlarını bozulacak listeye ekle
+        sopa_cezalilar[member.id] = datetime.now() + timedelta(minutes=2)
+
+        embed = discord.Embed(
+            title="🔨 Kafaya Sopa İndi!",
+            description=f"**{member.mention}** adlı kullanıcıya kafasına kaya gibi sopa indirildi!",
+            color=0xE74C3C,
+            timestamp=discord.utils.utcnow()
+        )
+        embed.add_field(name="⏳ Timeout Süresi", value="40 Saniye", inline=True)
+        embed.add_field(name="🌀 Bozuk Mesaj Süresi", value="2 Dakika", inline=True)
+        embed.add_field(name="📌 Sebep", value=sebep, inline=False)
+        embed.set_footer(text=f"Cezalandıran: {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
+        
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"⚠️ Sopa atılırken hata oluştu (Yetkim yetmiyor olabilir): {e}")
+
+@sopa.error
+async def sopa_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ Hey baksana, bu komutu kullanmak için `Üyeleri Zaman Aşımına Uğrat` yetkin olmalı!")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("❌ Kimi sopalayacağını etiketlemelisin! Örnek: `!sopa @kullanici [sebep]`")
+
+
+# --- DİĞER PRO KOMUTLAR ---
 
 @bot.command(name="avatar", help="Profil fotoğrafını büyütür.")
 async def avatar(ctx, member: discord.Member = None):
@@ -267,8 +320,6 @@ async def yazi(ctx, *, m: str):
 async def ping(ctx):
     await ctx.send(f"Pong! 🚀 {round(bot.latency * 1000)}ms")
 
-# --- 16 ila 50 EKSTRA YEPYENİ KOMUTLAR ---
-
 @bot.command(name="yazitura", help="Yazı tura atar.")
 async def yazitura(ctx):
     await ctx.send(f"🪙 Sonuç: **{random.choice(['Yazı 🦅', 'Tura 🪙'])}**")
@@ -285,7 +336,9 @@ async def renk(ctx):
 
 @bot.command(name="fakeprofil", help="Sahte kimlik.")
 async def fakeprofil(ctx):
-    await ctx.send(f"🕵️ Kimlik: {random.choice(['Ali Yılmaz', 'Ayşe Demir', 'John Doe']} - {random.choice(['Türkiye', 'Almanya', 'ABD'])}")
+    isim = random.choice(['Ali Yılmaz', 'Ayşe Demir', 'John Doe'])
+    ulke = random.choice(['Türkiye', 'Almanya', 'ABD'])
+    await ctx.send(f"🕵️ Kimlik: {isim} - {ulke}")
 
 @bot.command(name="soz", help="Felsefi söz.")
 async def soz(ctx):
@@ -315,7 +368,6 @@ async def hesapla(ctx, *, expr: str):
     except:
         await ctx.send("⚠️ Hesaplama hatası!")
 
-# Devam eden pratik ve eğlence komutları (35+ adet toplamı tamamlıyor)
 @bot.command(name="yavasmod", help="Yavaş mod.")
 async def yavasmod(ctx, saniye: int):
     await ctx.channel.edit(slowmode_delay=saniye)
@@ -323,7 +375,7 @@ async def yavasmod(ctx, saniye: int):
 
 @bot.command(name="coinflip", help="Yazı tura iddia.")
 async def coinflip(ctx):
-    await ctx.send(f" parayı attın: {random.choice(['Tura', 'Yazı'])}")
+    await ctx.send(f"parayı attın: {random.choice(['Tura', 'Yazı'])}")
 
 @bot.command(name="tarih", help="Bugünün tarihi.")
 async def tarih(ctx):
