@@ -88,7 +88,7 @@ async def send_startup_commit_notification():
         embed.add_field(name="📝 Commit", value=f">>> {commit_message}", inline=False)
         embed.add_field(name="🔗 Link", value=f"[Commit'e Git]({commit_url})", inline=True)
         embed.set_thumbnail(url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png")
-        embed.set_footer(text="Python Ultra Bot v54.0 Kaos Edition", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
+        embed.set_footer(text="Python Ultra Bot v55.0 Kaos Edition", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
 
         await channel.send(embed=embed)
     except Exception as e:
@@ -194,7 +194,7 @@ async def kaybi_oyunlara_dusur(guild, miktar, kaybeden):
     await oyunlar_kanali.send(embed=embed, view=view)
 
 
-# --- KUMARHANE & EKONOMİ SİSTEMİ ---
+# --- KUMARHANE & EKONOMİ SİSTEMİ (DÜZELTİLMİŞ & ÇOKLU ANİMASYONLU) ---
 
 @bot.command(name="bakiye", help="Cüzdanındaki parayı gösterir.")
 async def bakiye(ctx, member: discord.Member = None):
@@ -235,26 +235,34 @@ async def slots(ctx, miktar_str: str = "100"):
         await ctx.send("❌ Yetersiz bakiye veya geçersiz miktar!")
         return
 
+    # Parayı baştan düşüyoruz
     user_bakiye[author_id] -= miktar
-    msg = await ctx.send("🎰 **Slot Makinesi Çevriliyor...**\n[ 🔄 | 🔄 | 🔄 ]")
-    await asyncio.sleep(1)
     
-    sym = ["🍒", "🍋", "⭐", "🔔", "💎"]
+    # Detaylı slot animasyon adımları
+    msg = await ctx.send("🎰 **Slot Kolu Çekildi! Çarklar Dönüyor...**\n[ 🔄 | 🔄 | 🔄 ]")
+    await asyncio.sleep(0.8)
+    await msg.edit(content="🎰 **Slot Kolu Çekildi! Çarklar Dönüyor...**\n[ 🍒 | 🔄 | 🔄 ]")
+    await asyncio.sleep(0.8)
+    await msg.edit(content="🎰 **Slot Kolu Çekildi! Çarklar Dönüyor...**\n[ 🍒 | 🍋 | 🔄 ]")
+    await asyncio.sleep(0.8)
+    
+    sym = ["🍒", "🍋", "⭐", "🔔", "💎", "🍉", "🍇"]
     s = [random.choice(sym) for _ in range(3)]
     
     kazanc = 0
     if s[0] == s[1] == s[2]:
         kazanc = miktar * 5
-        sonuc = f"🎉 **JACKPOT!** {kazanc:,} Coin kazandın!"
+        user_bakiye[author_id] += kazanc
+        sonuc = f"🎉 **JACKPOT!** Harika bir vurgun yaptın, kazandın: **+{kazanc:,} Coin**!"
     elif s[0] == s[1] or s[1] == s[2] or s[0] == s[2]:
         kazanc = int(miktar * 1.5)
-        sonuc = f"✨ **Tebrikler!** {kazanc:,} Coin kazandın!"
+        user_bakiye[author_id] += kazanc
+        sonuc = f"✨ **Tebrikler!** İki sembol eşleşti, kazandın: **+{kazanc:,} Coin**!"
     else:
-        sonuc = f"💸 **Kaybettin!** Kaybettiğin **{miktar:,} Coin** yere saçıldı ve **#oyunlar** kanalına düştü!"
+        sonuc = f"💸 **Kaybettin!** Yatırılan **{miktar:,} Coin** buhar oldu, yere saçılıp **#oyunlar** kanalına düştü!"
         await kaybi_oyunlara_dusur(ctx.guild, miktar, ctx.author)
 
-    user_bakiye[author_id] += kazanc
-    await msg.edit(content=f"🎰 **Slot Sonucu**\n[ {s[0]} | {s[1]} | {s[2]} ]\n\n{sonuc}\n💼 Kalan Bakiye: **{user_bakiye[author_id]:,} Coin**")
+    await msg.edit(content=f"🎰 **Slot Sonucu**\n[ {s[0]} | {s[1]} | {s[2]} ]\n\n{sonuc}\n💼 Güncel Cüzdan: **{user_bakiye[author_id]:,} Coin**")
 
 @bot.command(name="rulet", help="Renk bazlı rulet oyunu (Örn: !rulet kirmizi 10k).")
 async def rulet(ctx, renk: str, miktar_str: str = "100"):
@@ -272,8 +280,14 @@ async def rulet(ctx, renk: str, miktar_str: str = "100"):
         return
 
     user_bakiye[author_id] -= miktar
-    msg = await ctx.send(f"🎲 Rulet çarkı dönüyor... ({renk.upper()} için {miktar:,} coin yatırıldı)")
-    await asyncio.sleep(1.5)
+    
+    # Rulet çok aşamalı animasyon
+    msg = await ctx.send(f"🎲 **Rulet çarkı çevrildi!** ({renk.upper()} için {miktar:,} coin)\n🌀 Çark hızla dönüyor... [ 🔴 | ⬛ | 🟢 ]")
+    await asyncio.sleep(1)
+    await msg.edit(content=f"🎲 **Rulet çarkı çevrildi!** ({renk.upper()} için {miktar:,} coin)\n🌀 Top sesekliyor... [ 🟢 | 🔴 | ⬛ ]")
+    await asyncio.sleep(1)
+    await msg.edit(content=f"🎲 **Rulet çarkı çevrildi!** ({renk.upper()} için {miktar:,} coin)\n🌀 Top yavaşlıyor... [ ⬛ | 🟢 | 🔴 ]")
+    await asyncio.sleep(1)
 
     sans = random.choices(["kirmizi", "siyah", "yesil"], weights=[48, 48, 4], k=1)[0]
     
@@ -282,12 +296,12 @@ async def rulet(ctx, renk: str, miktar_str: str = "100"):
         carpan = 14 if sans == "yesil" else 2
         kazanc = miktar * carpan
         user_bakiye[author_id] += kazanc
-        sonuc = f"🎯 Çark **{sans.upper()}** geldi! Kazandın: **+{kazanc:,} Coin**"
+        sonuc = f"🎯 Şans yüzüne güldü, çark **{sans.upper()}** geldi! Kazandın: **+{kazanc:,} Coin**"
     else:
-        sonuc = f"❌ Kaybettin! **{miktar:,} Coin** yere saçıldı ve **#oyunlar** kanalına düştü."
+        sonuc = f"❌ Kaybettin! Çark **{sans.upper()}** geldi. Yatırılan **{miktar:,} Coin** yere saçılıp **#oyunlar** kanalına düştü."
         await kaybi_oyunlara_dusur(ctx.guild, miktar, ctx.author)
 
-    await msg.edit(content=f"🎲 **Rulet Sonucu**\nGelen: **{sans.upper()}**\n\n{sonuc}\n💼 Kalan Bakiye: **{user_bakiye[author_id]:,} Coin**")
+    await msg.edit(content=f"🎲 **Rulet Sonucu**\nGelen Renk: **{sans.upper()}**\n\n{sonuc}\n💼 Güncel Cüzdan: **{user_bakiye[author_id]:,} Coin**")
 
 
 # --- !SOPA ---
