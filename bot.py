@@ -19,7 +19,6 @@ afk_users = {}
 user_bakiye = {}
 sopa_cezalilar = {}
 
-# Yardımcı Fonksiyon: 1k, 1m gibi ifadeleri sayıya çevirir
 def sayi_coumle(deger_str: str) -> int:
     deger_str = deger_str.lower().strip()
     carpici = 1
@@ -143,18 +142,18 @@ async def on_message(message):
     await bot.process_commands(message)
 
 
-# --- OTOMATİK #OYUNLAR HEDİYE MEKANİZMASI ---
+# --- YERE PARA DÜŞME & KAPIŞMA MEKANİZMASI ---
 
-class NitroParadButonu(discord.ui.View):
+class ParaKapmaButonu(discord.ui.View):
     def __init__(self, miktar):
         super().__init__(timeout=None)
         self.miktar = miktar
         self.tiklandi = False
 
-    @discord.ui.button(label="🎁 HEDİYEYİ KAPIŞ", style=discord.ButtonStyle.blurple, custom_id="nitro_parad_kap")
-    async def hediyeyi_kap(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="💵 PARAYI KAP", style=discord.ButtonStyle.green, custom_id="para_kap_buton")
+    async def parayi_kap(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.tiklandi:
-            await interaction.response.send_message("❌ Geç kaldın koçum, bunu başkası çoktan kaptı bile!", ephemeral=True)
+            await interaction.response.send_message("❌ Geç kaldın koçum, parayı çoktan başkası kaptı bile!", ephemeral=True)
             return
         
         self.tiklandi = True
@@ -168,11 +167,11 @@ class NitroParadButonu(discord.ui.View):
         
         embed = interaction.message.embeds[0]
         embed.color = 0x95A5A6
-        embed.title = "🎁 DİSCORD HEDİYESİ KAPILDI!"
-        embed.description = f"⚡ Nefesler tutuldu ve **{kazanan.mention}** adeta ışık hızında davranarak **{self.miktar:,} Coin**'lik batık ödülünü kaptı!"
+        embed.title = "💵 YERDEKİ PARA KAPILDI!"
+        embed.description = f"⚡ Yerdeki parayı gören **{kazanan.mention}** ortama mermi gibi dalıp **{self.miktar:,} Coin**'i cebine indirdi!"
         
         await interaction.message.edit(embed=embed, view=self)
-        await interaction.response.send_message(f"🎉 Helal olsun {kazanan.mention}! Cüzdanına eklendi: **+{self.miktar:,} Coin**!")
+        await interaction.response.send_message(f"🎉 Helal olsun {kazanan.mention}! Yerden kaldırdığın para cüzdanına eklendi: **+{self.miktar:,} Coin**!")
 
 
 async def kaybi_oyunlara_dusur(guild, miktar, kaybeden):
@@ -184,14 +183,14 @@ async def kaybi_oyunlara_dusur(guild, miktar, kaybeden):
         return
 
     embed = discord.Embed(
-        title="🎉 Birisi size bir Discord Hediyesi gönderdi!",
-        description=f"🎁 **{kaybeden.name}** kumarda battı ve ortaya **{miktar:,} Coin** değerinde ödül saçtı!\nAşağıdaki **Hediyeyi Kapış** butonuna **ilk tıklayan** parayı anında cebine atar. Görelim kim daha hızlı!",
-        color=0x5865F2,
+        title="💸 YERE PARA SAÇILDI!",
+        description=f"🚨 **{kaybeden.name}** kumarda fena battı ve yere **{miktar:,} Coin** saçtı!\nAşağıdaki **PARAYI KAP** butonuna **ilk tıklayan** parayı anında kapar. Görelim kim hızlı!",
+        color=0x2ECC71,
         timestamp=discord.utils.utcnow()
     )
     embed.set_footer(text=f"Batıran: {kaybeden.name}", icon_url=kaybeden.avatar.url if kaybeden.avatar else None)
     
-    view = NitroParadButonu(miktar)
+    view = ParaKapmaButonu(miktar)
     await oyunlar_kanali.send(embed=embed, view=view)
 
 
@@ -251,7 +250,7 @@ async def slots(ctx, miktar_str: str = "100"):
         kazanc = int(miktar * 1.5)
         sonuc = f"✨ **Tebrikler!** {kazanc:,} Coin kazandın!"
     else:
-        sonuc = f"💸 **Kaybettin!** Kaybettiğin **{miktar:,} Coin** anında **#oyunlar** kanalına hediye olarak fırlatıldı!"
+        sonuc = f"💸 **Kaybettin!** Kaybettiğin **{miktar:,} Coin** yere saçıldı ve **#oyunlar** kanalına düştü!"
         await kaybi_oyunlara_dusur(ctx.guild, miktar, ctx.author)
 
     user_bakiye[author_id] += kazanc
@@ -285,7 +284,7 @@ async def rulet(ctx, renk: str, miktar_str: str = "100"):
         user_bakiye[author_id] += kazanc
         sonuc = f"🎯 Çark **{sans.upper()}** geldi! Kazandın: **+{kazanc:,} Coin**"
     else:
-        sonuc = f"❌ Kaybettin! **{miktar:,} Coin** batık parası **#oyunlar** kanalına hediye olarak saçıldı."
+        sonuc = f"❌ Kaybettin! **{miktar:,} Coin** yere saçıldı ve **#oyunlar** kanalına düştü."
         await kaybi_oyunlara_dusur(ctx.guild, miktar, ctx.author)
 
     await msg.edit(content=f"🎲 **Rulet Sonucu**\nGelen: **{sans.upper()}**\n\n{sonuc}\n💼 Kalan Bakiye: **{user_bakiye[author_id]:,} Coin**")
