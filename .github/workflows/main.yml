@@ -1,28 +1,28 @@
-name: Big Brother Surveillance Bot
+name: Send Discord Commit Notification
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [ "*" ] # Hangi dala push atılırsa atılsın çalışır
+  workflow_dispatch: # İstersen GitHub'dan elinle de tetikleyebilirsin
 
 jobs:
-  build:
+  notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Repo kodunu çek
-        uses: actions/checkout@v3
+      - name: Kodları Çek
+        uses: actions/checkout@v4
 
-      - name: Python kur
-        uses: actions/setup-python@v4
+      - name: Node.js Kur
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.10'
+          node-version: '20'
 
-      - name: Bağımlılıkları yükle
-        run: |
-          pip install discord.py
+      - name: Bağımlılıkları Yükle
+        run: npm install
 
-      - name: Botu başlat
+      - name: Botu Çalıştır ve Bildirimi Gönder
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-        run: |
-          python bot.py
+          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+          GITHUB_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: node index.js
