@@ -1,9 +1,9 @@
-name: Send Discord Commit Notification
+name: Send Discord Commit Notification (Python)
 
 on:
   push:
-    branches: [ "*" ] # Hangi dala push atılırsa atılsın çalışır
-  workflow_dispatch: # İstersen GitHub'dan elinle de tetikleyebilirsin
+    branches: [ "*" ]
+  workflow_dispatch:
 
 jobs:
   notify:
@@ -12,17 +12,19 @@ jobs:
       - name: Kodları Çek
         uses: actions/checkout@v4
 
-      - name: Node.js Kur
-        uses: actions/setup-node@v4
+      - name: Python Kur
+        uses: actions/setup-python@v5
         with:
-          node-version: '20'
+          python-version: '3.10'
 
       - name: Bağımlılıkları Yükle
-        run: npm install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Botu Çalıştır ve Bildirimi Gönder
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
           GITHUB_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-        run: node index.js
+        run: python bot.py
