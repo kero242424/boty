@@ -69,7 +69,7 @@ async def send_startup_commit_notification():
         embed.add_field(name="📝 Commit", value=f">>> {commit_message}", inline=False)
         embed.add_field(name="🔗 Link", value=f"[Commit'e Git]({commit_url})", inline=True)
         embed.set_thumbnail(url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png")
-        embed.set_footer(text="Python Ultra Bot v52.0", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
+        embed.set_footer(text="Python Ultra Bot v53.0", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
 
         await channel.send(embed=embed)
     except Exception as e:
@@ -201,15 +201,11 @@ async def itiraf(ctx, *, mesaj: str):
     await ctx.send(embed=embed)
 
 
-# --- SINIRSIZ / YETKİ KISITLAMASIZ !SOPA ---
+# --- KENDİ ÜZERİNDE TEST EDİLEBİLİR !SOPA ---
 
 @bot.command(name="sopa", help="Belirtilen kullanıcıya 40 saniye timeout verir ve mesajlarını 2 dakika bozar.")
 async def sopa(ctx, member: discord.Member, *, sebep: str = "Test sopası"):
     try:
-        if member.id == ctx.author.id:
-            await ctx.send("❌ Kendine sopa atamazsın delikanlı! Başkasını etiketle.")
-            return
-
         sure = timedelta(seconds=40)
         await member.timeout(sure, reason=sebep)
         sopa_cezalilar[member.id] = datetime.now() + timedelta(minutes=2)
