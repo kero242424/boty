@@ -39,7 +39,7 @@ def sayi_coumle(deger_str: str) -> int:
 
 @bot.event
 async def on_ready():
-    print(f"Mega Ultra Bot devrede: {bot.user}")
+    print(f"Peak Animatör Bot devrede: {bot.user}")
     await send_startup_commit_notification()
 
 async def send_startup_commit_notification():
@@ -77,9 +77,9 @@ async def send_startup_commit_notification():
         ref_name = os.getenv("GITHUB_REF_NAME", "main")
 
         embed = discord.Embed(
-            title="🚀 Mega GitHub Entegrasyonu Tetiklendi!",
-            description="Yeni kod satırları sisteme başarıyla işlendi.",
-            color=0x9B59B6,
+            title="🚀 Peak Animasyon Entegrasyonu Tetiklendi!",
+            description="En üst düzey görsel efekt kodları sisteme başarıyla işlendi.",
+            color=0xF1C40F,
             timestamp=discord.utils.utcnow()
         )
         embed.add_field(name="📁 Depo", value=f"`{repo_name}`", inline=True)
@@ -88,7 +88,7 @@ async def send_startup_commit_notification():
         embed.add_field(name="📝 Commit", value=f">>> {commit_message}", inline=False)
         embed.add_field(name="🔗 Link", value=f"[Commit'e Git]({commit_url})", inline=True)
         embed.set_thumbnail(url="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png")
-        embed.set_footer(text="Python Ultra Bot v55.0 Kaos Edition", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
+        embed.set_footer(text="Python Peak Bot v56.0 Ultimate Edition", icon_url="https://cdn-icons-png.flaticon.com/512/25/25231.png")
 
         await channel.send(embed=embed)
     except Exception as e:
@@ -142,7 +142,7 @@ async def on_message(message):
     await bot.process_commands(message)
 
 
-# --- YERE PARA DÜŞME & KAPIŞMA MEKANİZMASI ---
+# --- PEAK YERE PARA DÜŞME & KAPIŞMA MEKANİZMASI ---
 
 class ParaKapmaButonu(discord.ui.View):
     def __init__(self, miktar):
@@ -168,7 +168,7 @@ class ParaKapmaButonu(discord.ui.View):
         embed = interaction.message.embeds[0]
         embed.color = 0x95A5A6
         embed.title = "💵 YERDEKİ PARA KAPILDI!"
-        embed.description = f"⚡ Yerdeki parayı gören **{kazanan.mention}** ortama mermi gibi dalıp **{self.miktar:,} Coin**'i cebine indirdi!"
+        embed.description = f"⚡ Yerdeki parayı gören **{kazanan.mention}** şimşek gibi atılıp **{self.miktar:,} Coin**'i havada kaptı!"
         
         await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(f"🎉 Helal olsun {kazanan.mention}! Yerden kaldırdığın para cüzdanına eklendi: **+{self.miktar:,} Coin**!")
@@ -194,7 +194,7 @@ async def kaybi_oyunlara_dusur(guild, miktar, kaybeden):
     await oyunlar_kanali.send(embed=embed, view=view)
 
 
-# --- KUMARHANE & EKONOMİ SİSTEMİ (DÜZELTİLMİŞ & ÇOKLU ANİMASYONLU) ---
+# --- PEAK KUMARHANE & ANİMASYONLU OYUNLAR ---
 
 @bot.command(name="bakiye", help="Cüzdanındaki parayı gösterir.")
 async def bakiye(ctx, member: discord.Member = None):
@@ -212,7 +212,7 @@ async def gunluk(ctx):
     user_bakiye[author_id] = para
     await ctx.send(f"🎁 {ctx.author.mention} Günlük bonusunu aldın! Cüzdana **+500 Coin** eklendi.")
 
-@bot.command(name="paraekle", help="Belirtilen kullanıcıya para ekler (Örn: !paraekle @user 1m).")
+@bot.command(name="paraekle", help="Belirtilen kullanıcıya para ekler.")
 async def paraekle(ctx, member: discord.Member, miktar_str: str):
     miktar = sayi_coumle(miktar_str)
     if miktar <= 0:
@@ -225,7 +225,7 @@ async def paraekle(ctx, member: discord.Member, miktar_str: str):
     user_bakiye[author_id] = yeni_bakiye
     await ctx.send(f"💸 {member.mention} hesabına **{miktar:,} Coin** eklendi! Yeni bakiye: **{yeni_bakiye:,} Coin**")
 
-@bot.command(name="slots", help="Animasyonlu slot makinesi (Örn: !slots 50k).")
+@bot.command(name="slots", help="Peak animasyonlu slot makinesi.")
 async def slots(ctx, miktar_str: str = "100"):
     miktar = sayi_coumle(miktar_str)
     author_id = ctx.author.id
@@ -235,16 +235,17 @@ async def slots(ctx, miktar_str: str = "100"):
         await ctx.send("❌ Yetersiz bakiye veya geçersiz miktar!")
         return
 
-    # Parayı baştan düşüyoruz
     user_bakiye[author_id] -= miktar
     
-    # Detaylı slot animasyon adımları
-    msg = await ctx.send("🎰 **Slot Kolu Çekildi! Çarklar Dönüyor...**\n[ 🔄 | 🔄 | 🔄 ]")
-    await asyncio.sleep(0.8)
-    await msg.edit(content="🎰 **Slot Kolu Çekildi! Çarklar Dönüyor...**\n[ 🍒 | 🔄 | 🔄 ]")
-    await asyncio.sleep(0.8)
-    await msg.edit(content="🎰 **Slot Kolu Çekildi! Çarklar Dönüyor...**\n[ 🍒 | 🍋 | 🔄 ]")
-    await asyncio.sleep(0.8)
+    # PEAK 5 AŞAMALI SLOT ANİMASYONU
+    msg = await ctx.send("🎰 **[ SLOT KOLU ÇEKİLDİ ]**\n⚡ Çarklar hızla dönüyor...\n[ 🔄 | 🔄 | 🔄 ]")
+    await asyncio.sleep(0.5)
+    await msg.edit(content="🎰 **[ SLOT KOLU ÇEKİLDİ ]**\n⚡ Birinci çark kilitleniyor...\n[ 🍒 | 🔄 | 🔄 ]")
+    await asyncio.sleep(0.5)
+    await msg.edit(content="🎰 **[ SLOT KOLU ÇEKİLDİ ]**\n⚡ İkinci çark duruyor...\n[ 🍒 | 🍋 | 🔄 ]")
+    await asyncio.sleep(0.5)
+    await msg.edit(content="🎰 **[ SLOT KOLU ÇEKİLDİ ]**\n⚡ Son çark yavaşlıyor...\n[ 🍒 | 🍋 | ⭐ ]")
+    await asyncio.sleep(0.6)
     
     sym = ["🍒", "🍋", "⭐", "🔔", "💎", "🍉", "🍇"]
     s = [random.choice(sym) for _ in range(3)]
@@ -253,18 +254,18 @@ async def slots(ctx, miktar_str: str = "100"):
     if s[0] == s[1] == s[2]:
         kazanc = miktar * 5
         user_bakiye[author_id] += kazanc
-        sonuc = f"🎉 **JACKPOT!** Harika bir vurgun yaptın, kazandın: **+{kazanc:,} Coin**!"
+        sonuc = f"🎉 **DEV JACKPOT!** Muazzam bir vurgun yaptın, kazandın: **+{kazanc:,} Coin**!"
     elif s[0] == s[1] or s[1] == s[2] or s[0] == s[2]:
         kazanc = int(miktar * 1.5)
         user_bakiye[author_id] += kazanc
-        sonuc = f"✨ **Tebrikler!** İki sembol eşleşti, kazandın: **+{kazanc:,} Coin**!"
+        sonuc = f"✨ **TEBRİKLER!** İki sembol eşleşti, kazandın: **+{kazanc:,} Coin**!"
     else:
-        sonuc = f"💸 **Kaybettin!** Yatırılan **{miktar:,} Coin** buhar oldu, yere saçılıp **#oyunlar** kanalına düştü!"
+        sonuc = f"💸 **KAYBETTİN!** Yatırılan **{miktar:,} Coin** buhar olup yere saçıldı ve **#oyunlar** kanalına düştü!"
         await kaybi_oyunlara_dusur(ctx.guild, miktar, ctx.author)
 
-    await msg.edit(content=f"🎰 **Slot Sonucu**\n[ {s[0]} | {s[1]} | {s[2]} ]\n\n{sonuc}\n💼 Güncel Cüzdan: **{user_bakiye[author_id]:,} Coin**")
+    await msg.edit(content=f"🎰 **[ SLOT SONUCU ]**\n[ {s[0]} | {s[1]} | {s[2]} ]\n\n{sonuc}\n💼 Güncel Cüzdan: **{user_bakiye[author_id]:,} Coin**")
 
-@bot.command(name="rulet", help="Renk bazlı rulet oyunu (Örn: !rulet kirmizi 10k).")
+@bot.command(name="rulet", help="Peak animasyonlu rulet oyunu.")
 async def rulet(ctx, renk: str, miktar_str: str = "100"):
     author_id = ctx.author.id
     bakiye_miktari = user_bakiye.get(author_id, 1000)
@@ -281,13 +282,15 @@ async def rulet(ctx, renk: str, miktar_str: str = "100"):
 
     user_bakiye[author_id] -= miktar
     
-    # Rulet çok aşamalı animasyon
-    msg = await ctx.send(f"🎲 **Rulet çarkı çevrildi!** ({renk.upper()} için {miktar:,} coin)\n🌀 Çark hızla dönüyor... [ 🔴 | ⬛ | 🟢 ]")
-    await asyncio.sleep(1)
-    await msg.edit(content=f"🎲 **Rulet çarkı çevrildi!** ({renk.upper()} için {miktar:,} coin)\n🌀 Top sesekliyor... [ 🟢 | 🔴 | ⬛ ]")
-    await asyncio.sleep(1)
-    await msg.edit(content=f"🎲 **Rulet çarkı çevrildi!** ({renk.upper()} için {miktar:,} coin)\n🌀 Top yavaşlıyor... [ ⬛ | 🟢 | 🔴 ]")
-    await asyncio.sleep(1)
+    # PEAK 4 AŞAMALI RULET ANİMASYONU
+    msg = await ctx.send(f"🎲 **[ RULET ÇARKı ÇEVRİLDİ ]** ({renk.upper()} - {miktar:,} Coin)\n🌀 Top hızla fırlatıldı...\n[ 🔴 | ⬛ | 🟢 ]")
+    await asyncio.sleep(0.7)
+    await msg.edit(content=f"🎲 **[ RULET ÇARKı ÇEVRİLDİ ]** ({renk.upper()} - {miktar:,} Coin)\n🌀 Çark çılgın gibi dönüyor...\n[ 🟢 | 🔴 | ⬛ ]")
+    await asyncio.sleep(0.7)
+    await msg.edit(content=f"🎲 **[ RULET ÇARKı ÇEVRİLDİ ]** ({renk.upper()} - {miktar:,} Coin)\n🌀 Top bölmelerin üzerinde sekliyor...\n[ ⬛ | 🟢 | 🔴 ]")
+    await asyncio.sleep(0.7)
+    await msg.edit(content=f"🎲 **[ RULET ÇARKı ÇEVRİLDİ ]** ({renk.upper()} - {miktar:,} Coin)\n🌀 Top yavaşlıyor, durmak üzere...\n[ 🔴 | ⬛ | 🟢 ]")
+    await asyncio.sleep(0.8)
 
     sans = random.choices(["kirmizi", "siyah", "yesil"], weights=[48, 48, 4], k=1)[0]
     
@@ -296,17 +299,17 @@ async def rulet(ctx, renk: str, miktar_str: str = "100"):
         carpan = 14 if sans == "yesil" else 2
         kazanc = miktar * carpan
         user_bakiye[author_id] += kazanc
-        sonuc = f"🎯 Şans yüzüne güldü, çark **{sans.upper()}** geldi! Kazandın: **+{kazanc:,} Coin**"
+        sonuc = f"🎯 Şans yüzüne güldü, top **{sans.upper()}** üzerinde durdu! Kazandın: **+{kazanc:,} Coin**"
     else:
-        sonuc = f"❌ Kaybettin! Çark **{sans.upper()}** geldi. Yatırılan **{miktar:,} Coin** yere saçılıp **#oyunlar** kanalına düştü."
+        sonuc = f"❌ Kaybettin! Top **{sans.upper()}** bölgesine düştü. Yatırılan **{miktar:,} Coin** yere saçılıp **#oyunlar** kanalına düştü."
         await kaybi_oyunlara_dusur(ctx.guild, miktar, ctx.author)
 
-    await msg.edit(content=f"🎲 **Rulet Sonucu**\nGelen Renk: **{sans.upper()}**\n\n{sonuc}\n💼 Güncel Cüzdan: **{user_bakiye[author_id]:,} Coin**")
+    await msg.edit(content=f"🎲 **[ RULET SONUCU ]**\nGelen Renk: **{sans.upper()}**\n\n{sonuc}\n💼 Güncel Cüzdan: **{user_bakiye[author_id]:,} Coin**")
 
 
 # --- !SOPA ---
 
-@bot.command(name="sopa", help="Belirtilen kullanıcıya 40 saniye timeout verir ve mesajlarını 2 dakika bozar.")
+@bot.command(name="sopa", help="Belirtilen kullanıcıya timeout ve bozuk mesaj cezası verir.")
 async def sopa(ctx, member: discord.Member, *, sebep: str = "Test sopası"):
     try:
         sure = timedelta(seconds=40)
@@ -331,7 +334,7 @@ async def sopa(ctx, member: discord.Member, *, sebep: str = "Test sopası"):
 
 # --- DİĞER PRO KOMUTLAR ---
 
-@bot.command(name="havadurumu", help="Belirtilen şehrin anlık hava durumunu gösterir.")
+@bot.command(name="havadurumu", help="Anlık hava durumu.")
 async def havadurumu(ctx, *, sehir: str = "Istanbul"):
     try:
         url = f"https://wttr.in/{sehir}?format=j1"
