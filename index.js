@@ -8,11 +8,28 @@ client.once('ready', async () => {
     console.log(`Bot giriş yaptı: ${client.user.tag}`);
 
     try {
+        let channel = null;
         const channelId = process.env.DISCORD_CHANNEL_ID;
-        const channel = await client.channels.fetch(channelId);
+
+        // 1. Eğer Secret'ta ID tanımlıysa onu bulmaya çalış
+        if (channelId && channelId.trim() !== "") {
+            try {
+                channel = await client.channels.fetch(channelId);
+            } catch (e) {
+                console.log("Girilen Kanal ID geçersiz, sunucudaki ilk kanal aranıyor...");
+            }
+        }
+
+        // 2. ID yoksa veya bulunamadıysa, botun olduğu sunuculardaki ilk uygun metin kanalını seç
+        if (!channel) {
+            const guild = client.guilds.cache.first();
+            if (guild) {
+                channel = guild.channels.cache.find(c => c.isTextBased() && c.permissionsFor(client.user)?.has('SendMessages'));
+            }
+        }
 
         if (!channel) {
-            console.error("Kanal bulunamadı!");
+            console.error("Hata: Mesaj atılabilecek hiçbir metin kanalı bulunamadı!");
             process.exit(1);
         }
 
@@ -27,7 +44,7 @@ client.once('ready', async () => {
 
         // Bol özellikli, havalı bir Discord Embed tasarımı
         const embed = new EmbedBuilder()
-            .setColor(0x00FF7F) // Canlı bir yeşil renk
+            .setColor(0x00FF7F)
             .setTitle(`🚀 Yeni Kod Güncellemesi Alındı!`)
             .setDescription(`Depoda hareketlilik var! Yeni commit başarıyla sisteme işlendi ve Discord'a bildirildi.`)
             .addFields(
@@ -40,11 +57,11 @@ client.once('ready', async () => {
             )
             .setThumbnail('https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png')
             .setTimestamp()
-            .setFooter({ text: 'GitHub Actions Bot v2.0 • Otomatik Bildirim Sistemi', iconURL: 'https://cdn-icons-png.flaticon.com/512/25/25231.png' });
+            .setFooter({ text: 'GitHub Actions Bot v2.1 • Otomatik Bildirim Sistemi', iconURL: 'https://cdn-icons-png.flaticon.com/512/25/25231.png' });
 
-        // Mesajı kanala çak
+        // Mesajı kanala gönder
         await channel.send({ embeds: [embed] });
-        console.log("Bildirim Discord'a başarıyla fırlatıldı!");
+        console.log(`Bildirim başarıyla '${channel.name}' kanalına fırlatıldı!`);
 
     } catch (error) {
         console.error("Bir hata oluştu:", error);
@@ -54,5 +71,4 @@ client.once('ready', async () => {
     }
 });
 
-// Senin secrets'ta tanımladığın DISCORD_TOKEN'ı buraya direkt bağladık
 client.login(process.env.DISCORD_TOKEN);
