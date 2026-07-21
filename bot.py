@@ -201,7 +201,101 @@ async def itiraf(ctx, *, mesaj: str):
     await ctx.send(embed=embed)
 
 
-# --- KENDİ ÜZERİNDE TEST EDİLEBİLİR !SOPA ---
+# --- KUMARHANE & EKONOMİ SİSTEMİ ---
+
+@bot.command(name="bakiye", help="Cüzdanındaki parayı gösterir.")
+async def bakiye(ctx, member: discord.Member = None):
+    target = member or ctx.author
+    para = user_bakiye.get(target.id, 1000) # Varsayılan başlangıç 1000 coin
+    user_bakiye[target.id] = para
+    embed = discord.Embed(title=f"💰 {target.name} - Cüzdan", description=f"Güncel Bakiye: **{para:,} Coin**", color=0xF1C40F)
+    await ctx.send(embed=embed)
+
+@bot.command(name="gunluk", help="Her gün 500 coin toplarsın.")
+async def gunluk(ctx):
+    author_id = ctx.author.id
+    para = user_bakiye.get(author_id, 1000)
+    para += 500
+    user_bakiye[author_id] = para
+    await ctx.send(f"🎁 {ctx.author.mention} Günlük bonusunu aldın! Cüzdana **+500 Coin** eklendi. Toplam: **{para:,} Coin**")
+
+@bot.command(name="paraekle", help="Belirtilen kullanıcıya para ekler (Test amaçlı).")
+async def paraekle(ctx, member: discord.Member, miktar: int):
+    author_id = member.id
+    mevcut = user_bakiye.get(author_id, 1000)
+    yeni_bakiye = mevcut + miktar
+    user_bakiye[author_id] = yeni_bakiye
+    await ctx.send(f"💸 {member.mention} hesabına **{miktar:,} Coin** eklendi! Yeni bakiye: **{yeni_bakiye:,} Coin**")
+
+@bot.command(name="slots", help="Animasyonlu slot makinesi.")
+async def slots(ctx, miktar: int = 100):
+    author_id = ctx.author.id
+    bakiye_miktari = user_bakiye.get(author_id, 1000)
+
+    if miktar <= 0 or bakiye_miktari < miktar:
+        await ctx.send("❌ Yetersiz bakiye veya geçersiz miktar!")
+        return
+
+    user_bakiye[author_id] -= miktar
+
+    msg = await ctx.send("🎰 **Slot Makinesi Çevriliyor...**\n[ 🔄 | 🔄 | 🔄 ]")
+    
+    # Simüle edilmiş animasyon adımları
+    import asyncio
+    await asyncio.sleep(1)
+    
+    sym = ["🍒", "🍋", "⭐", "🔔", "💎"]
+    s = [random.choice(sym) for _ in range(3)]
+    
+    kazanc = 0
+    if s[0] == s[1] == s[2]:
+        kazanc = miktar * 5
+        sonuc = f"🎉 **JACKPOT!** {kazanc:,} Coin kazandın!"
+    elif s[0] == s[1] or s[1] == s[2] or s[0] == s[2]:
+        kazanc = int(miktar * 1.5)
+        sonuc = f"✨ **Tebrikler!** İki aynı sembol yakaladın, {kazanc:,} Coin kazandın!"
+    else:
+        sonuc = "💸 **Kaybettin!** Bahtına küs."
+
+    user_bakiye[author_id] += kazanc
+    await msg.edit(content=f"🎰 **Slot Makinesi Sonucu**\n[ {s[0]} | {s[1]} | {s[2]} ]\n\n{sonuc}\n💼 Kalan Bakiye: **{user_bakiye[author_id]:,} Coin**")
+
+@bot.command(name="rulet", help="Renk bazlı rulet oyunu (kirmizi / siyah / yesil).")
+async def rulet(ctx, renk: str, miktar: int = 100):
+    author_id = ctx.author.id
+    bakiye_miktari = user_bakiye.get(author_id, 1000)
+    renk = renk.lower()
+
+    if renk not in ["kirmizi", "siyah", "yesil"]:
+        await ctx.send("❌ Geçersiz renk! `kirmizi`, `siyah` veya `yesil` seçmelisin.")
+        return
+
+    if miktar <= 0 or bakiye_miktari < miktar:
+        await ctx.send("❌ Yetersiz bakiye!")
+        return
+
+    user_bakiye[author_id] -= miktar
+    msg = await ctx.send(f"🎲 Rulet çarkı dönüyor... ({renk.upper()} için {iktar} coin yatırıldı)")
+    
+    import asyncio
+    await asyncio.sleep(1.5)
+
+    # %48 Kırmızı, %48 Siyah, %4 Yeşil
+    sans = random.choices(["kirmizi", "siyah", "yesil"], weights=[48, 48, 4], k=1)[0]
+    
+    kazanc = 0
+    if sans == renk:
+        carpan = 14 if sans == "yesil" else 2
+        kazanc = miktar * carpan
+        user_bakiye[author_id] += kazanc
+        sonuc = f"🎯 Çark **{sans.upper()}** geldi! Kazandın: **+{kazanc:,} Coin**"
+    else:
+        sonuc = f"❌ Çark **{sans.upper()}** geldi. Kaybettin!"
+
+    await msg.edit(content=f"🎲 **Rulet Sonucu**\nGelen Renk: **{sans.upper()}**\n\n{sonuc}\n💼 Kalan Bakiye: **{user_bakiye[author_id]:,} Coin**")
+
+
+# --- !SOPA ---
 
 @bot.command(name="sopa", help="Belirtilen kullanıcıya 40 saniye timeout verir ve mesajlarını 2 dakika bozar.")
 async def sopa(ctx, member: discord.Member, *, sebep: str = "Test sopası"):
@@ -223,7 +317,7 @@ async def sopa(ctx, member: discord.Member, *, sebep: str = "Test sopası"):
         
         await ctx.send(embed=embed)
     except Exception as e:
-        await ctx.send(f"⚠️ Sopa atılırken hata oluştu (Botun rolü hedef kişininkinden yukarıda olmalı!): {e}")
+        await ctx.send(f"⚠️ Sopa atılırken hata oluştu: {e}")
 
 
 # --- DİĞER PRO KOMUTLAR ---
@@ -279,12 +373,6 @@ async def tkm(ctx, secim: str):
     if secim.lower() not in s: return await ctx.send("Geçersiz!")
     b = random.choice(s)
     await ctx.send(f"Sen: {secim} | Bot: {b} | Sonuç: {'Berabere' if secim==b else 'Kazandın' if (secim=='taş' and b=='makas') or (secim=='kağıt' and b=='taş') or (secim=='makas' and b=='kağıt') else 'Kaybettin'}")
-
-@bot.command(name="slots", help="Slot çevir.")
-async def slots(ctx):
-    sym = ["🍒", "🍋", "⭐", "🔔"]
-    s = [random.choice(sym) for _ in range(3)]
-    await ctx.send(f"[ {' | '.join(s)} ] -> {'JACKPOT!' if s[0]==s[1]==s[2] else 'Kaybettin'}")
 
 @bot.command(name="bilgi", help="İlginç bilgi.")
 async def bilgi(ctx):
@@ -359,10 +447,6 @@ async def hesapla(ctx, *, expr: str):
 async def yavasmod(ctx, saniye: int):
     await ctx.channel.edit(slowmode_delay=saniye)
     await ctx.send(f"⏳ Yavaş mod {saniye} saniye yapıldı.")
-
-@bot.command(name="coinflip", help="Yazı tura iddia.")
-async def coinflip(ctx):
-    await ctx.send(f"parayı attın: {random.choice(['Tura', 'Yazı'])}")
 
 @bot.command(name="tarih", help="Bugünün tarihi.")
 async def tarih(ctx):
