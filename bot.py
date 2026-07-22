@@ -3,7 +3,6 @@ import discord
 from discord.ext import commands
 import requests
 
-# Botun yetkileri (Intents)
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -20,14 +19,11 @@ async def roblox_ara(ctx, username: str = None):
         await ctx.send("⚠️ Lütfen bir Roblox kullanıcı adı gir! Örnek: `!ara kerocu24`")
         return
 
-    # Başındaki @ işaretini temizle
     username = username.lstrip('@')
-    
-    # Bekliyor mesajı
-    msg = await ctx.send(f"🔍 `{username}` aranıyor...")
+    msg = await ctx.send(f"🔍 `{username}` profili derinlemesine taranıyor...")
 
     try:
-        # 1. Kullanıcı ID ve temel bilgilerini bulma
+        # 1. Kullanıcı ID ve temel bilgileri bulma
         search_res = requests.post(
             "https://users.roblox.com/v1/usernames/users",
             json={"usernames": [username], "excludeBannedUsers": True}
@@ -35,7 +31,7 @@ async def roblox_ara(ctx, username: str = None):
         search_data = search_res.json()
 
         if not search_data.get("data") or len(search_data["data"]) == 0:
-            await msg.edit(content=f"❌ `{username}` adında bir Roblox kullanıcı bulunamadı!")
+            await msg.edit(content=f"❌ `{username}` adında aktif bir Roblox kullanıcı bulunamadı!")
             return
 
         user_info = search_data["data"][0]
@@ -43,40 +39,61 @@ async def roblox_ara(ctx, username: str = None):
         display_name = user_info["displayName"]
         name = user_info["name"]
 
-        # 2. Detaylı Bilgiler (Biyografi ve Kayıt Tarihi)
+        # 2. Detaylı Bilgiler (Biyografi, Kayıt Tarihi, Ban Durumu)
         detail_res = requests.get(f"https://users.roblox.com/v1/users/{user_id}")
         detail_data = detail_res.json()
         
         bio = detail_data.get("description", "Biyografi yok.")
-        if len(bio) > 100:  
-            bio = bio[:100] + "..."
+        if len(bio) > 150:  
+            bio = bio[:150] + "..."
         if not bio.strip():
             bio = "Boş"
 
-        created_at = detail_data.get("created", "Bilinmiyor")[:10] # Sadece YYYY-MM-DD
+        created_at = detail_data.get("created", "Bilinmiyor")[:10]
+        is_banned = detail_data.get("isBanned", False)
+        status_text = "🚫 Banlı" if is_banned else "✅ Aktif / Temiz"
 
-        # 3. Avatar Resmi (Headshot)
+        # 3. Avatar Resmi (Tam boy veya Headshot - Yüksek Kalite)
         thumb_res = requests.get(
             f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={user_id}&size=420x420&format=Png&isCircular=false"
         )
         thumb_data = thumb_res.json()
         avatar_url = thumb_data["data"][0]["imageUrl"]
 
-        # 4. Arkadaş Sayısı
+        # 4. Arkadaş, Takipçi ve Takip Edilen Sayıları
         friends_res = requests.get(f"https://friends.roblox.com/v1/users/{user_id}/friends/count")
-        friends_count = friends_res.json().get("count", "Gizli")
+        friends_count = friends_res.json().get("count", 0)
 
-        # Discord Embed (Guns.lol tarzı şık kart)
+        followers_res = requests.get(f"https://friends.roblox.com/v1/users/{user_id}/followers/count")
+        followers_count = followers_res.json().get("count", 0)
+
+        following_res = requests.get(f"https://friends.roblox.com/v1/users/{user_id}/following/count")
+        following_count = following_res.json().get("count", 0)
+
+        # 5. Rozet (Badge) Sayısı
+        badges_res = requests.get(f"https://badges.roblox.com/v1/users/{user_id}/badges?limit=10")
+        badges_count = len(badges_res.json().get("data", []))
+        badges_display = f"{badges_count}+" if badges_count >= 10 else str(badges_count)
+
+        # Discord Embed Tasarımı (Daha detaylı ve zengin)
         embed = discord.Embed(
-            title=f"{display_name} (@{name})",
+            title=f"⚡ {display_name} (`@{name}`)",
             url=f"https://www.roblox.com/users/{user_id}/profile",
-            description=f"```{bio}```",
-            color=0x3b82f6
+            color=0x6366f1
         )
+        
         embed.set_thumbnail(url=avatar_url)
-        embed.add_field(name="👥 Arkadaş", value=str(friends_count), inline=True)
-        embed.add_field(name="📅 Kayıt Tarihi", value=str(created_at), inline=True)
-        embed.set_footer(text="Roblox Flex Bot ⚡", icon_url=avatar_url)
+        
+        embed.add_field(name="📜 Biyografi", value=f"```{bio}```", inline=False)
+        embed.add_field(name="📅 Kayıt Tarihi", value=f"`{created_at}`", inline=True)
+        embed.add_field(name="🛡️ Hesap Durumu", value=status_text, inline=True)
+        embed.add_field(name="🏆 Rozetler", value=f"`{badges_display}`", inline=True)
+        
+        embed.add_field(name="👥 Arkadaş", value=f"`{friends_count}`", inline=True)
+        embed.add_field(name="📥 Takipçi", value=f"`{followers_count}`", inline=True)
+        embed.add_field(name="📤 Takip Edilen", value=f"`{following_count}`", inline=True)
+        
+        embed.set_footer(text=f"ID: {user_id} • Roblox Flex Bot 🚀", icon_url=avatar_url)
 
         await msg.edit(content=None, embed=embed)
 
@@ -84,10 +101,8 @@ async def roblox_ara(ctx, username: str = None):
         print(f"Hata oluştu: {e}")
         await msg.edit(content="⚠️ Bilgiler çekilirken bir hata oluştu.")
 
-# Tokeni GitHub Secrets içinden (DISCORD_TOKEN) güvenle alır
 token = os.environ.get('DISCORD_TOKEN')
-
-if not token:
-    print("HATA: DISCORD_TOKEN bulunamadı!")
-else:
+if token:
     bot.run(token)
+else:
+    print("HATA: DISCORD_TOKEN bulunamadı!")
