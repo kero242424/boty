@@ -1,15 +1,17 @@
-name: Send Discord Commit Notification (Python)
+name: Roblox Discord Bot
 
 on:
   push:
-    branches: [ "*" ]
+    branches: [ main ]
   workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *' # Her 5 dakikada bir tetiklenerek botun düşmesini engeller
 
 jobs:
-  notify:
+  run-bot:
     runs-on: ubuntu-latest
     steps:
-      - name: Kodları Çek
+      - name: Kodları Depodan Çek
         uses: actions/checkout@v4
 
       - name: Python Kur
@@ -22,9 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Botu Çalıştır ve Bildirimi Gönder
+      - name: Botu Başlat
         env:
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
-          GITHUB_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: python bot.py
