@@ -1,200 +1,257 @@
 import os
 import random
 import string
-import hashlib
+import base64
+import asyncio
 import discord
-from discord.ext import commands
 from discord import app_commands
+from cryptography.fernet import Fernet
 
-# Botun yetkileri (Intents)
-intents = discord.Intents.default()
-intents.message_content = True
+# ---------------------------------------------------------------------------
+# YAPILANDIRMA VE İSTEMCİ BAŞLATMA
+# ---------------------------------------------------------------------------
 
-class SecurityBot(commands.Bot):
+TOKEN = os.getenv("DISCORD_TOKEN")
+TARGET_CHANNEL_NAME = "botcage"  # Botun sadece çalışacağı kanal adı
+
+class SecureGenBot(discord.Client):
     def __init__(self):
-        super().__init__(command_prefix="!", intents=intents)
+        intents = discord.Intents.default()
+        super().__init__(intents=intents)
+        self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        # Slash komutlarını senkronize et
+        # Slash komutlarını Discord'a senkronize et
         await self.tree.sync()
-        print(f"[*] Slash komutları senkronize edildi: {self.user}")
+        print(f"[{self.user}] Komut ağacı başarıyla senkronize edildi.")
 
-    async def on_ready(self):
-        print(f"[*] Bot aktif: {self.user.name} (ID: {self.user.id})")
-        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="/sifre | Güvenlik Botu"))
+bot = SecureGenBot()
 
-bot = SecurityBot()
+@bot.event
+async def on_ready():
+    print(f"Sistem Aktif: {bot.user.name} (ID: {bot.user.id})")
+    print("--------------------------------------------------")
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"#{TARGET_CHANNEL_NAME} | Güvenli Mod"))
 
-# --- YARDIMCI FONKSİYONLAR ---
-def calculate_entropy_and_time(password: str) -> tuple:
-    length = len(password)
-    charset_size = 0
-    
-    has_lower = any(c.islower() for c in password)
-    has_upper = any(c.isupper() for c in password)
-    has_digit = any(c.isdigit() for c in password)
-    has_symbol = any(not c.isalnum() for c in password)
+# ---------------------------------------------------------------------------
+# KANAL KONTROL FİLTRESİ (Sadece #botcage için)
+# ---------------------------------------------------------------------------
 
-    if has_lower: charset_size += 26
-    if has_upper: charset_size += 26
-    if has_digit: charset_size += 10
-    if has_symbol: charset_size += 32
+def is_allowed_channel():
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if interaction.guild is None:
+            return True
+            
+        if interaction.channel.name != TARGET_CHANNEL_NAME:
+            await interaction.response.send_message(
+                f"❌ Bu botun komutları sadece **#{TARGET_CHANNEL_NAME}** kanalında kullanılabilir! Lütfen oraya geç.", 
+                ephemeral=True
+            )
+            return False
+        return True
+    return app_commands.check(predicate)
 
-    if charset_size == 0 or length == 0:
-        return 0, "Çok Zayıf", "Anında"
+# ---------------------------------------------------------------------------
+# YARDIMCI MATEMATİKSEL & KRİPTOGRAFİK FONKSİYONLAR
+# ---------------------------------------------------------------------------
 
-    # Entropi hesaplama (bit cinsinden)
+def calculate_entropy(length: int, pool_size: int) -> float:
+    if length <= 0 or pool_size <= 0:
+        return 0.0
     import math
-    entropy = length * math.log2(charset_size)
+    return length * math.log2(pool_size)
 
-    # Kırılma süresi tahmini (Saniyede 10 milyar tahmin varsayımıyla)
-    combinations = charset_size ** length
-    seconds = combinations / 10_000_000_000
-
-    if seconds < 1:
-        time_str = "Anında (< 1 saniye)"
-    elif seconds < 60:
-        time_str = f"{int(seconds)} saniye"
-    elif seconds < 3600:
-        time_str = f"{int(seconds / 60)} dakika"
-    elif seconds < 86400:
-        time_str = f"{int(seconds / 3600)} saat"
-    elif seconds < 31536000:
-        time_str = f"{int(seconds / 86400)} gün"
-    elif seconds < 31536000 * 100:
-        time_str = f"{int(seconds / 31536000)} yıl"
-    else:
-        time_str = "Yüzyıllar / Kırılamaz"
-
+def get_entropy_rating(entropy: float) -> tuple[str, str]:
     if entropy < 28:
-        strength = "🔴 Çok Zayıf"
+        return "Çok Zayıf (Kırılabilir)", "🔴"
     elif entropy < 36:
-        strength = "🟠 Zayıf"
+        return "Zayıf", "🟠"
     elif entropy < 60:
-        strength = "🟡 Orta"
+        return "Orta / Kabul Edilebilir", "🟡"
     elif entropy < 80:
-        strength = "🟢 Güçlü"
+        return "Güçlü", "🟢"
     else:
-        strength = "💎 Mükemmel (Askeri Düzey)"
+        return "Askeri Düzey / Mükemmel", "🟣"
 
-    return entropy, strength, time_str
+# ---------------------------------------------------------------------------
+# MODAL: Güvenli Not / Şifreleme Paneli
+# ---------------------------------------------------------------------------
 
-# --- SLASH KOMUTLARI ---
+class SecretModal(discord.ui.Modal, title="🔒 Güvenli Metin / Şifre Saklayıcı"):
+    secret_input = discord.ui.TextInput(
+        label="Şifrelenecek Gizli Metin",
+        style=discord.TextStyle.paragraph,
+        placeholder="Buraya başkalarının görmesini istemediğin metni yaz...",
+        required=True,
+        max_length=1000
+    )
 
-@bot.tree.command(name="sifre", description="Özelleştirilebilir, yüksek güvenlikli şifre üretir.")
+    async def on_submit(self, interaction: discord.Interaction):
+        key = Fernet.generate_key()
+        f = Fernet(key)
+        
+        encoded_text = self.secret_input.value.encode('utf-8')
+        encrypted_text = f.encrypt(encoded_text).decode('utf-8')
+        
+        embed = discord.Embed(
+            title="🔐 Metin Başarıyla Şifrelendi",
+            description="Metniniz Fernet algoritması ile koruma altına alındı.",
+            color=discord.Color.dark_embed()
+        )
+        embed.add_field(name="Şifrelenmiş Veri (Ciphertext)", value=f"```{encrypted_text}```", inline=False)
+        embed.add_field(name="Çözme Anahtarı (Key)", value=f"```{key.decode('utf-8')}```", inline=False)
+        embed.set_footer(text="Bu anahtarı kaybederseniz metne tekrar ulaşamazsınız!")
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# ---------------------------------------------------------------------------
+# SLASH KOMUTLARI
+# ---------------------------------------------------------------------------
+
+@bot.tree.command(name="sifre", description="Özelleştirilebilir, yüksek entropili güvenli bir şifre üretir.")
 @app_commands.describe(
-    uzunluk="Şifre uzunluğu (Varsayılan: 16, Max: 100)",
-    ozel_karakter="Özel karakterler (!@#$...) olsun mu?",
-    benzerleri_ele="Karıştırılabilecek karakterleri ele (I, l, 1, O, 0)"
+    uzunluk="Şifre uzunluğu (Varsayılan: 16, Maks: 128)",
+    rakam="Rakamlar (0-9) dahil edilsin mi?",
+    sembol="Özel karakterler (!@#$...) dahil edilsin mi?",
+    benzersiz="Karıştırılması muhtemel karakterler (I, l, O, 0) hariç tutulsun mu?"
 )
-async def sifre(interaction: discord.Interaction, uzunluk: int = 16, ozel_karakter: bool = True, benzerleri_ele: bool = False):
-    if uzunluk < 4 or uzunluk > 100:
-        await interaction.response.send_message("❌ Şifre uzunluğu **4 ile 100** arasında olmalıdır.", ephemeral=True)
+@is_allowed_channel()
+async def sifre(
+    interaction: discord.Interaction, 
+    uzunluk: int = 16, 
+    rakam: bool = True, 
+    sembol: bool = True,
+    benzersiz: bool = False
+):
+    if uzunluk < 4 or uzunluk > 128:
+        await interaction.response.send_message("❌ Uzunluk en az **4**, en fazla **128** karakter olabilir.", ephemeral=True)
         return
 
-    lower = string.ascii_lowercase
-    upper = string.ascii_uppercase
-    digits = string.digits
-    symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    chars = string.ascii_letters
+    pool_size = len(string.ascii_lowercase) + len(string.ascii_uppercase)
 
-    if benzerleri_ele:
-        for char in "Il1O0":
-            lower = lower.replace(char, "")
-            upper = upper.replace(char, "")
-            digits = digits.replace(char, "")
+    if rakam:
+        chars += string.digits
+        pool_size += 10
+    if sembol:
+        chars += "!@#$%^&*()_+-=[]{}|;:,.<>?"
+        pool_size += 28
+    
+    if benzersiz:
+        ambiguous = "IlO01"
+        chars = "".join(c for c in chars if c not in ambiguous)
 
-    char_pool = lower + upper + digits
-    if ozel_karakter:
-        char_pool += symbols
+    rnd = random.SystemRandom()
+    password = "".join(rnd.choice(chars) for _ in range(uzunluk))
 
-    # Her karakter tipinden en az bir tane garantileme
-    password_chars = [
-        random.choice(lower),
-        random.choice(upper),
-        random.choice(digits)
-    ]
-    if ozel_karakter:
-        password_chars.append(random.choice(symbols))
+    entropy = calculate_entropy(uzunluk, len(chars))
+    rating, emoji = get_entropy_rating(entropy)
 
-    # Kalan uzunluğu tamamla
-    for _ in range(uzunluk - len(password_chars)):
-        password_chars.append(random.choice(char_pool))
-
-    random.shuffle(password_chars)
-    password = "".join(password_chars)
-
-    entropy, strength, crack_time = calculate_entropy_and_time(password)
-
-    embed = discord.Embed(title="🔐 Güvenli Şifre Üretildi", color=discord.Color.blurple())
-    embed.add_field(name="🔑 Şifreniz", value=f"```ansi\n\u001b[32m{password}\u001b[0m\n```", inline=False)
-    embed.add_field(name="📊 Güvenlik Seviyesi", value=strength, inline=True)
-    embed.add_field(name="⏳ Kırılma Süresi", value=crack_time, inline=True)
-    embed.add_field(name="📏 Uzunluk", value=str(uzunluk), inline=True)
-    embed.set_footer(text="Güvenliğiniz için bu mesajı kimseyle paylaşmayın ve şifreyi kopyaladıktan sonra silin.")
-
-    await interaction.response.send_message(embed=embed, ephemeral=True)
-
-@bot.tree.command(name="passphrase", description="Akılda kalıcı ama kırılması çok zor kelime tabanlı şifre üretir.")
-@app_commands.describe(kelime_sayisi="Kelime sayısı (Varsayılan: 4, Max: 8)")
-async def passphrase(interaction: discord.Interaction, kelime_sayisi: int = 4):
-    if kelime_sayisi < 3 or kelime_sayisi > 8:
-        await interaction.response.send_message("❌ Kelime sayısı **3 ile 8** arasında olmalıdır.", ephemeral=True)
-        return
-
-    kelimeler = [
-        "elma", "masa", "bulut", "kalem", "deniz", "kitap", "sehpa", "kahve", 
-        "gitar", "orman", "yildiz", "bilgisayar", "yaprak", "telefon", "toprak", 
-        "bayrak", "sabun", "bardak", "çiçek", "rüzgar", "mavi", "gece", "güneş"
-    ]
-
-    secilenler = [random.choice(kelimeler) for _ in range(kelime_sayisi)]
-    # Rastgele bir kelimeyi büyük harf yap ve sonuna sayı/sembol ekle
-    secilenler[0] = secilenler[0].capitalize()
-    passphrase_str = "-".join(secilenler) + str(random.randint(10, 99)) + "!"
-
-    embed = discord.Embed(title="🌿 Passphrase (Anlamlı Şifre) Üretildi", color=discord.Color.green())
-    embed.add_field(name="🔑 Şifreniz", value=f"```ansi\n\u001b[32m{passphrase_str}\u001b[0m\n```", inline=False)
-    embed.set_footer(text="Bu şifreyi hatırlamak kolay, kırmak oldukça zordur.")
-
-    await interaction.response.send_message(embed=embed, ephemeral=True)
-
-@bot.tree.command(name="guvenlik", description="Bir şifrenin güvenlik gücünü ve kırılma süresini test eder.")
-@app_commands.describe(sifre="Test etmek istediğiniz şifre")
-async def guvenlik(interaction: discord.Interaction, sifre: str):
-    entropy, strength, crack_time = calculate_entropy_and_time(sifre)
-
-    embed = discord.Embed(title="🔍 Şifre Analiz Raporu", color=discord.Color.gold())
-    embed.add_field(name="📊 Güvenlik Durumu", value=strength, inline=False)
-    embed.add_field(name="⏳ Tahmini Kırılma Süresi", value=crack_time, inline=False)
-    embed.add_field(name="📏 Uzunluk", value=f"{len(sifre)} karakter", inline=True)
-    embed.add_field(name="🧮 Entropi Değeri", value=f"{entropy:.2f} bit", inline=True)
+    embed = discord.Embed(title="🛡️ Şifre Üreticisi - Sonuç", color=discord.Color.blurple())
+    embed.add_field(name="Oluşturulan Parola", value=f"```{password}```", inline=False)
+    embed.add_field(name="Karakter Uzunluğu", value=f"`{uzunluk} karakter`", inline=True)
+    embed.add_field(name="Güvenlik Skoru", value=f"{emoji} `{rating}`", inline=True)
+    embed.add_field(name="Entropi", value=f"`{entropy:.1f} bit`", inline=True)
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@bot.tree.command(name="hash", description="Metinleri MD5 veya SHA algoritmalarıyla şifreler (Hash).")
-@app_commands.describe(algoritma="Algoritma seçin", metin="Hashlenecek metin")
-@app_commands.choices(algoritma=[
-    app_commands.Choice(name="MD5", value="md5"),
-    app_commands.Choice(name="SHA-256", value="sha256"),
-    app_commands.Choice(name="SHA-512", value="sha512")
-])
-async def hash_komut(interaction: discord.Interaction, algoritma: app_commands.Choice[str], metin: str):
-    if algoritma.value == "md5":
-        h = hashlib.md5(metin.encode()).hexdigest()
-    elif algoritma.value == "sha256":
-        h = hashlib.sha256(metin.encode()).hexdigest()
-    elif algoritma.value == "sha512":
-        h = hashlib.sha512(metin.encode()).hexdigest()
 
-    embed = discord.Embed(title=f"🔒 Hash Sonucu ({algoritma.name})", color=discord.Color.dark_purple())
-    embed.add_field(name="Girdi", value=f"`{metin}`", inline=False)
-    embed.add_field(name="Çıktı (Hash)", value=f"```code\n{h}\n```", inline=False)
+@app_commands.checks.cooldown(1, 5, key=lambda i: i.user.id)
+@bot.tree.command(name="passphrase", description="Okunması kolay, kelime tabanlı güvenli bir parola cümlesi üretir.")
+@app_commands.describe(kelime_sayisi="Kelime sayısı (Varsayılan: 4, Maks: 10)")
+@is_allowed_channel()
+async def passphrase(interaction: discord.Interaction, kelime_sayisi: int = 4):
+    if kelime_sayisi < 3 or kelime_sayisi > 10:
+        await interaction.response.send_message("❌ Kelime sayısı 3 ile 10 arasında olmalıdır.", ephemeral=True)
+        return
 
+    word_list = [
+        "yildiz", "gezegen", "bilgisayar", "kahve", "kitap", "orman", "deniz", 
+        "ruzgar", "bulut", "kalem", "telefon", "muzik", "sanat", "yaprak", 
+        "kopru", "liman", "marti", "toprak", "yazilim", "donanim", "atlas", 
+        "pusula", "mercan", "galaksi", "safir", "volkan", "gokyuzu", "ritim"
+    ]
+    
+    rnd = random.SystemRandom()
+    selected_words = [rnd.choice(word_list) for _ in range(kelime_sayisi)]
+    
+    separator = rnd.choice(["-", "_", ".", ""])
+    formatted_words = []
+    for w in selected_words:
+        if rnd.random() > 0.5:
+            w = w.capitalize()
+        if rnd.random() > 0.7:
+            w += str(rnd.randint(10, 99))
+        formatted_words.append(w)
+
+    final_passphrase = separator.join(formatted_words)
+    
+    embed = discord.Embed(title="🧠 Passphrase (Parola Cümlesi)", color=discord.Color.green())
+    embed.add_field(name="Cümle", value=f"```{final_passphrase}```", inline=False)
+    embed.add_field(name="Bilgi", value="Hatırlaması kolay, kaba kuvvet saldırılarına karşı son derece dirençlidir.", inline=False)
+    
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# Botu Çalıştır
-TOKEN = os.getenv("DISCORD_TOKEN")
-if not TOKEN:
-    print("❌ HATA: DISCORD_TOKEN çevresel değişkeni (Secret) bulunamadı!")
-else:
-    bot.run(TOKEN)
+
+@bot.tree.command(name="pin", description="Hızlı kullanım için sayısal bir PIN kodu üretir.")
+@app_commands.describe(hane="PIN uzunluğu (Varsayılan: 4, Maks: 16)")
+@is_allowed_channel()
+async def pin(interaction: discord.Interaction, hane: int = 4):
+    if hane < 3 or hane > 16:
+        await interaction.response.send_message("❌ PIN uzunluğu 3 ile 16 hane arasında olmalıdır.", ephemeral=True)
+        return
+
+    rnd = random.SystemRandom()
+    pin_code = "".join(rnd.choice(string.digits) for _ in range(hane))
+
+    embed = discord.Embed(title="🔢 Güvenli PIN Kodu", color=discord.Color.gold())
+    embed.add_field(name="PIN", value=f"```{pin_code}```", inline=False)
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="sifrele", description="Bir metni şifreli formata dönüştürür (Açılır panel açar).")
+@is_allowed_channel()
+async def sifrele(interaction: discord.Interaction):
+    await interaction.response.send_modal(SecretModal())
+
+
+@bot.tree.command(name="yardim", description="Botun komutları ve özellikleri hakkında bilgi verir.")
+@is_allowed_channel()
+async def yardim(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🤖 SecureGen Bot - Yardım Menüsü",
+        description=f"Bu botun tüm komutları yalnızca **#{TARGET_CHANNEL_NAME}** kanalında çalışacak şekilde yapılandırılmıştır.",
+        color=discord.Color.dark_theme()
+    )
+    embed.add_field(
+        name="🛠️ Komutlar",
+        value=(
+            "**/sifre** - Özelleştirilebilir güçlü şifre üretir.\n"
+            "**/passphrase** - Kelime tabanlı, akılda kalıcı parola cümlesi üretir.\n"
+            "**/pin** - Sayısal PIN kodu üretir.\n"
+            "**/sifrele** - Hassas verileriniz için şifreli metin bloğu oluşturur."
+        ),
+        inline=False
+    )
+    embed.set_footer(text="Tüm şifre üretim işlemleri gizli (ephemeral) olarak yürütülür.")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+@sifre.error
+@passphrase.error
+@pin.error
+async def command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        await interaction.response.send_message(f"⏳ Bu komut bekleme süresindedir. Lütfen `{error.retry_after:.1f}` saniye sonra tekrar deneyin.", ephemeral=True)
+    else:
+        pass
+
+# ---------------------------------------------------------------------------
+# ÇALIŞTIRMA
+# ---------------------------------------------------------------------------
+if __name__ == "__main__":
+    if not TOKEN:
+        print("HATA: DISCORD_TOKEN ortam değişkeni bulunamadı!")
+    else:
+        bot.run(TOKEN)
