@@ -1,132 +1,200 @@
 import os
+import random
+import string
+import hashlib
 import discord
 from discord.ext import commands
-import requests
+from discord import app_commands
 
+# Botun yetkileri (Intents)
 intents = discord.Intents.default()
 intents.message_content = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+class SecurityBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix="!", intents=intents)
 
-@bot.event
-async def on_ready():
-    print(f'Bot aktif ve bağlandı: {bot.user.name}')
-    await bot.change_presence(activity=discord.Game(name="!ara <roblox_adi>"))
+    async def setup_hook(self):
+        # Slash komutlarını senkronize et
+        await self.tree.sync()
+        print(f"[*] Slash komutları senkronize edildi: {self.user}")
 
-@bot.command(name="ara")
-async def roblox_ara(ctx, username: str = None):
-    if not username:
-        await ctx.send("⚠️ Lütfen bir Roblox kullanıcı adı gir! Örnek: `!ara kerocu24`")
+    async def on_ready(self):
+        print(f"[*] Bot aktif: {self.user.name} (ID: {self.user.id})")
+        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="/sifre | Güvenlik Botu"))
+
+bot = SecurityBot()
+
+# --- YARDIMCI FONKSİYONLAR ---
+def calculate_entropy_and_time(password: str) -> tuple:
+    length = len(password)
+    charset_size = 0
+    
+    has_lower = any(c.islower() for c in password)
+    has_upper = any(c.isupper() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    has_symbol = any(not c.isalnum() for c in password)
+
+    if has_lower: charset_size += 26
+    if has_upper: charset_size += 26
+    if has_digit: charset_size += 10
+    if has_symbol: charset_size += 32
+
+    if charset_size == 0 or length == 0:
+        return 0, "Çok Zayıf", "Anında"
+
+    # Entropi hesaplama (bit cinsinden)
+    import math
+    entropy = length * math.log2(charset_size)
+
+    # Kırılma süresi tahmini (Saniyede 10 milyar tahmin varsayımıyla)
+    combinations = charset_size ** length
+    seconds = combinations / 10_000_000_000
+
+    if seconds < 1:
+        time_str = "Anında (< 1 saniye)"
+    elif seconds < 60:
+        time_str = f"{int(seconds)} saniye"
+    elif seconds < 3600:
+        time_str = f"{int(seconds / 60)} dakika"
+    elif seconds < 86400:
+        time_str = f"{int(seconds / 3600)} saat"
+    elif seconds < 31536000:
+        time_str = f"{int(seconds / 86400)} gün"
+    elif seconds < 31536000 * 100:
+        time_str = f"{int(seconds / 31536000)} yıl"
+    else:
+        time_str = "Yüzyıllar / Kırılamaz"
+
+    if entropy < 28:
+        strength = "🔴 Çok Zayıf"
+    elif entropy < 36:
+        strength = "🟠 Zayıf"
+    elif entropy < 60:
+        strength = "🟡 Orta"
+    elif entropy < 80:
+        strength = "🟢 Güçlü"
+    else:
+        strength = "💎 Mükemmel (Askeri Düzey)"
+
+    return entropy, strength, time_str
+
+# --- SLASH KOMUTLARI ---
+
+@bot.tree.command(name="sifre", description="Özelleştirilebilir, yüksek güvenlikli şifre üretir.")
+@app_commands.describe(
+    uzunluk="Şifre uzunluğu (Varsayılan: 16, Max: 100)",
+    ozel_karakter="Özel karakterler (!@#$...) olsun mu?",
+    benzerleri_ele="Karıştırılabilecek karakterleri ele (I, l, 1, O, 0)"
+)
+async def sifre(interaction: discord.Interaction, uzunluk: int = 16, ozel_karakter: bool = True, benzerleri_ele: bool = False):
+    if uzunluk < 4 or uzunluk > 100:
+        await interaction.response.send_message("❌ Şifre uzunluğu **4 ile 100** arasında olmalıdır.", ephemeral=True)
         return
 
-    username = username.lstrip('@')
-    msg = await ctx.send(f"🔍 `{username}` evrensel olarak taranıyor, her şey çekiliyor...")
+    lower = string.ascii_lowercase
+    upper = string.ascii_uppercase
+    digits = string.digits
+    symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?"
 
-    try:
-        # 1. Kullanıcı ID ve Temel Bilgiler
-        search_res = requests.post(
-            "https://users.roblox.com/v1/usernames/users",
-            json={"usernames": [username], "excludeBannedUsers": True}
-        )
-        search_data = search_res.json()
+    if benzerleri_ele:
+        for char in "Il1O0":
+            lower = lower.replace(char, "")
+            upper = upper.replace(char, "")
+            digits = digits.replace(char, "")
 
-        if not search_data.get("data") or len(search_data["data"]) == 0:
-            await msg.edit(content=f"❌ `{username}` adında aktif/geçerli bir Roblox kullanıcı bulunamadı!")
-            return
+    char_pool = lower + upper + digits
+    if ozel_karakter:
+        char_pool += symbols
 
-        user_info = search_data["data"][0]
-        user_id = user_info["id"]
-        display_name = user_info["displayName"]
-        name = user_info["name"]
+    # Her karakter tipinden en az bir tane garantileme
+    password_chars = [
+        random.choice(lower),
+        random.choice(upper),
+        random.choice(digits)
+    ]
+    if ozel_karakter:
+        password_chars.append(random.choice(symbols))
 
-        # 2. Detaylı Profil Bilgileri (Biyografi, Kayıt, Ban Durumu)
-        detail_res = requests.get(f"https://users.roblox.com/v1/users/{user_id}")
-        detail_data = detail_res.json()
-        
-        bio = detail_data.get("description", "Biyografi yok.")
-        if len(bio) > 120:  
-            bio = bio[:120] + "..."
-        if not bio.strip():
-            bio = "Boş"
+    # Kalan uzunluğu tamamla
+    for _ in range(uzunluk - len(password_chars)):
+        password_chars.append(random.choice(char_pool))
 
-        created_at = detail_data.get("created", "Bilinmiyor")[:10]
-        is_banned = detail_data.get("isBanned", False)
-        status_text = "🚫 Banlı / Askıda" if is_banned else "🟢 Aktif Hesap"
+    random.shuffle(password_chars)
+    password = "".join(password_chars)
 
-        # 3. Anlık Durum (Oyunda mı, Çevrim içi mi?)
-        presence_res = requests.post(
-            "https://presence.roblox.com/v1/presence/users",
-            json={"userIds": [user_id]}
-        )
-        presence_data = presence_res.json().get("userPresences", [{}])[0]
-        presence_type = presence_data.get("userPresenceType", 0)
-        
-        # Durum kodları: 0=Çevrimdışı, 1=Çevrim içi, 2=Oyunda, 3=Stüdyoda
-        status_map = {0: "🔴 Çevrimdışı", 1: "🟢 Çevrim İçi", 2: "🎮 Oyunda", 3: "💻 Studio'da"}
-        current_status = status_map.get(presence_type, "Bilinmiyor")
-        game_name = presence_data.get("lastLocation", "")
+    entropy, strength, crack_time = calculate_entropy_and_time(password)
 
-        # 4. Takipçi, Takip Edilen ve Arkadaş İstatistikleri
-        friends_count = requests.get(f"https://friends.roblox.com/v1/users/{user_id}/friends/count").json().get("count", 0)
-        followers_count = requests.get(f"https://friends.roblox.com/v1/users/{user_id}/followers/count").json().get("count", 0)
-        following_count = requests.get(f"https://friends.roblox.com/v1/users/{user_id}/following/count").json().get("count", 0)
+    embed = discord.Embed(title="🔐 Güvenli Şifre Üretildi", color=discord.Color.blurple())
+    embed.add_field(name="🔑 Şifreniz", value=f"```ansi\n\u001b[32m{password}\u001b[0m\n```", inline=False)
+    embed.add_field(name="📊 Güvenlik Seviyesi", value=strength, inline=True)
+    embed.add_field(name="⏳ Kırılma Süresi", value=crack_time, inline=True)
+    embed.add_field(name="📏 Uzunluk", value=str(uzunluk), inline=True)
+    embed.set_footer(text="Güvenliğiniz için bu mesajı kimseyle paylaşmayın ve şifreyi kopyaladıktan sonra silin.")
 
-        # 5. Gruplar (Ana grubu / Rolü)
-        groups_res = requests.get(f"https://groups.roblox.com/v1/users/{user_id}/groups/roles")
-        groups_data = groups_res.json().get("data", [])
-        primary_group = "Yok"
-        if groups_data:
-            # En üstteki grubu veya ilk grubu alalım
-            primary_group = f"{groups_data[0]['group']['name']} ({groups_data[0]['role']['name']})"
-            if len(primary_group) > 35: primary_group = primary_group[:32] + "..."
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
-        # 6. Full Boy / Yüksek Kaliteli Avatar Görseli
-        thumb_res = requests.get(
-            f"https://thumbnails.roblox.com/v1/users/avatar?userIds={user_id}&size=720x720&format=Png&isCircular=false"
-        )
-        avatar_url = thumb_res.json()["data"][0]["imageUrl"]
+@bot.tree.command(name="passphrase", description="Akılda kalıcı ama kırılması çok zor kelime tabanlı şifre üretir.")
+@app_commands.describe(kelime_sayisi="Kelime sayısı (Varsayılan: 4, Max: 8)")
+async def passphrase(interaction: discord.Interaction, kelime_sayisi: int = 4):
+    if kelime_sayisi < 3 or kelime_sayisi > 8:
+        await interaction.response.send_message("❌ Kelime sayısı **3 ile 8** arasında olmalıdır.", ephemeral=True)
+        return
 
-        # 7. Rozet İstatistiği
-        badges_res = requests.get(f"https://badges.roblox.com/v1/users/{user_id}/badges?limit=100")
-        badges_count = len(badges_res.json().get("data", []))
+    kelimeler = [
+        "elma", "masa", "bulut", "kalem", "deniz", "kitap", "sehpa", "kahve", 
+        "gitar", "orman", "yildiz", "bilgisayar", "yaprak", "telefon", "toprak", 
+        "bayrak", "sabun", "bardak", "çiçek", "rüzgar", "mavi", "gece", "güneş"
+    ]
 
-        # Discord Embed (Ultra Detaylı Kart Tasarımı)
-        embed = discord.Embed(
-            title=f"👑 {display_name} (`@{name}`)",
-            url=f"https://www.roblox.com/users/{user_id}/profile",
-            description=f"**Bio:** ```{bio}```",
-            color=0x4f46e5
-        )
-        
-        # Büyük tam boy avatar görseli sağ üst köşeye veya büyük resim olarak eklenir
-        embed.set_image(url=avatar_url)
-        
-        # Alanlar (Fields)
-        embed.add_field(name="📌 Hesap ID", value=f"`{user_id}`", inline=True)
-        embed.add_field(name="📅 Kayıt Tarihi", value=f"`{created_at}`", inline=True)
-        embed.add_field(name="🛡️ Durum", value=status_text, inline=True)
-        
-        embed.add_field(name="⚡ Anlık Aktivite", value=f"{current_status}", inline=True)
-        if game_name and presence_type == 2:
-            embed.add_field(name="🕹️ Oynadığı Yer", value=f"`{game_name}`", inline=True)
-            
-        embed.add_field(name="👥 Arkadaş", value=f"`{friends_count}`", inline=True)
-        embed.add_field(name="📥 Takipçi", value=f"`{followers_count}`", inline=True)
-        embed.add_field(name="📤 Takip Edilen", value=f"`{following_count}`", inline=True)
-        
-        embed.add_field(name="⭐ Başlıca Grup", value=f"`{primary_group}`", inline=False)
-        embed.add_field(name="🏆 Toplam Rozet", value=f"`{badges_count}+`", inline=True)
+    secilenler = [random.choice(kelimeler) for _ in range(kelime_sayisi)]
+    # Rastgele bir kelimeyi büyük harf yap ve sonuna sayı/sembol ekle
+    secilenler[0] = secilenler[0].capitalize()
+    passphrase_str = "-".join(secilenler) + str(random.randint(10, 99)) + "!"
 
-        embed.set_footer(text=f"Roblox Ultimate Flex Bot • İsteyen: {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else None)
+    embed = discord.Embed(title="🌿 Passphrase (Anlamlı Şifre) Üretildi", color=discord.Color.green())
+    embed.add_field(name="🔑 Şifreniz", value=f"```ansi\n\u001b[32m{passphrase_str}\u001b[0m\n```", inline=False)
+    embed.set_footer(text="Bu şifreyi hatırlamak kolay, kırmak oldukça zordur.")
 
-        await msg.edit(content=None, embed=embed)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    except Exception as e:
-        print(f"Hata detayı: {e}")
-        await msg.edit(content="⚠️ Veriler çekilirken beklenmeyen bir hata oluştu veya Roblox API limiti aşıldı.")
+@bot.tree.command(name="guvenlik", description="Bir şifrenin güvenlik gücünü ve kırılma süresini test eder.")
+@app_commands.describe(sifre="Test etmek istediğiniz şifre")
+async def guvenlik(interaction: discord.Interaction, sifre: str):
+    entropy, strength, crack_time = calculate_entropy_and_time(sifre)
 
-token = os.environ.get('DISCORD_TOKEN')
-if token:
-    bot.run(token)
+    embed = discord.Embed(title="🔍 Şifre Analiz Raporu", color=discord.Color.gold())
+    embed.add_field(name="📊 Güvenlik Durumu", value=strength, inline=False)
+    embed.add_field(name="⏳ Tahmini Kırılma Süresi", value=crack_time, inline=False)
+    embed.add_field(name="📏 Uzunluk", value=f"{len(sifre)} karakter", inline=True)
+    embed.add_field(name="🧮 Entropi Değeri", value=f"{entropy:.2f} bit", inline=True)
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="hash", description="Metinleri MD5 veya SHA algoritmalarıyla şifreler (Hash).")
+@app_commands.describe(algoritma="Algoritma seçin", metin="Hashlenecek metin")
+@app_commands.choices(algoritma=[
+    app_commands.Choice(name="MD5", value="md5"),
+    app_commands.Choice(name="SHA-256", value="sha256"),
+    app_commands.Choice(name="SHA-512", value="sha512")
+])
+async def hash_komut(interaction: discord.Interaction, algoritma: app_commands.Choice[str], metin: str):
+    if algoritma.value == "md5":
+        h = hashlib.md5(metin.encode()).hexdigest()
+    elif algoritma.value == "sha256":
+        h = hashlib.sha256(metin.encode()).hexdigest()
+    elif algoritma.value == "sha512":
+        h = hashlib.sha512(metin.encode()).hexdigest()
+
+    embed = discord.Embed(title=f"🔒 Hash Sonucu ({algoritma.name})", color=discord.Color.dark_purple())
+    embed.add_field(name="Girdi", value=f"`{metin}`", inline=False)
+    embed.add_field(name="Çıktı (Hash)", value=f"```code\n{h}\n```", inline=False)
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# Botu Çalıştır
+TOKEN = os.getenv("DISCORD_TOKEN")
+if not TOKEN:
+    print("❌ HATA: DISCORD_TOKEN çevresel değişkeni (Secret) bulunamadı!")
 else:
-    print("HATA: DISCORD_TOKEN bulunamadı!")
+    bot.run(TOKEN)
