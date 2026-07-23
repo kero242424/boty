@@ -1,21 +1,20 @@
-name: Discord Bot 24/7
+name: SecureGen Discord Bot
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
-  schedule:
-    # Her 6 saatte bir tetiklenerek botun düşmesini engeller
-    - cron: '0 */6 * * *'
+    branches: [ main, master ]
+  workflow_dispatch: # Elle de tetikleyebilirsin
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 360 # GitHub'ın izin verdiği maksimum sürelerden biri (6 saat)
+    
     steps:
-    - name: Repo'yu Kopyala
+    - name: Kodları Depodan Çek
       uses: actions/checkout@v4
 
-    - name: Python Kurulumu
+    - name: Python Ortamını Kur
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
@@ -29,6 +28,4 @@ jobs:
       env:
         DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
       run: |
-        python bot.py &
-        # Botun arkaplanda kesintisiz çalışması için bekleme döngüsü (Actions süresince veya cron yenilenene kadar)
-        sleep 21600
+        python bot.py
